@@ -1,24 +1,58 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Confa App RFID</string>
-    <string name="next">Next</string>
-    <string name="previous">Previous</string>
-    <string name="lorem_ipsum">Lorem ipsum dolor sit amet...</string>
-    <string name="action_settings">Settings</string>
-    <string name="first_fragment_label">First Fragment</string>
-    <string name="second_fragment_label">Second Fragment</string>
 
-    <string name="epc_filter_hint">Filtro EPC (vacío = todas)</string>
-    <string name="read_mode_title">Modo de lectura</string>
-    <string name="read_mode_continuous">Lectura continua</string>
-    <string name="read_mode_single">Lectura única (una etiqueta)</string>
-    <string name="dialog_cancel">Cancelar</string>
+    <string name="sede_label">Sede de inventario</string>
+    <string name="mode_label">Modo</string>
+    <string name="mode_reconcile">Conciliación inventario</string>
+    <string name="mode_missing_search">Búsqueda de faltantes</string>
 
-    <string name="btn_export">Exportar / compartir (.xls)</string>
-    <string name="export_empty">No hay EPC para exportar</string>
-    <string name="export_error">No se pudo crear el archivo</string>
-    <string name="export_chooser_title">Enviar lista de EPC</string>
-    <string name="export_subject">Lista EPC RFID</string>
-    <string name="export_sheet_name">EPCs</string>
-    <string name="export_column_epc">EPC</string>
+    <string name="btn_import_master">Importar maestro (CSV / Excel XML)</string>
+    <string name="btn_import_missing">Importar lista faltantes</string>
+    <string name="btn_new_session">Nueva sesión</string>
+    <string name="btn_start_scan">Iniciar escaneo</string>
+    <string name="btn_pause">Pausar</string>
+    <string name="btn_resume">Continuar</string>
+    <string name="btn_finalize">Finalizar</string>
+    <string name="btn_export_reports">Exportar reportes (.xls)</string>
+
+    <string name="scan_status_idle">Listo</string>
+    <string name="scan_status_scanning">Escaneando…</string>
+    <string name="scan_status_paused">En pausa</string>
+    <string name="scan_status_done">Sesión finalizada</string>
+
+    <string name="counter_unique">Únicos: %1$d</string>
+    <string name="counter_total">Lecturas: %1$d</string>
+    <string name="counter_missing_found">Faltantes localizados: %1$d / %2$d</string>
+
+    <string name="col_rfid">RFID</string>
+    <string name="col_ubicacion">Ubicación</string>
+    <string name="col_responsable">Resp.</string>
+
+    <string name="import_running">Importando…</string>
+    <string name="import_ok">Cargados %1$d registros (duplicados omitidos: %2$d)</string>
+    <string name="import_missing_ok">Lista faltantes: %1$d RFID</string>
+    <string name="finalize_processing">Procesando conciliación…</string>
+    <string name="need_master">Importe el archivo maestro</string>
+    <string name="need_missing_list">Importe el archivo de faltantes</string>
+    <string name="need_sede">Seleccione la sede</string>
+    <string name="export_nothing">No hay reporte para exportar</string>
+    <string name="export_io_error">Error al generar el archivo</string>
+    <string name="export_chooser">Compartir reporte</string>
+    <string name="export_chooser_three_files">Compartir 3 reportes (.xls)</string>
+    <string name="export_subject_conciliation">Conciliación RFID</string>
+    <string name="export_subject_missing">Búsqueda faltantes RFID</string>
+
+    <string-array name="sedes_inventario">
+        <item>Versalles</item>
+        <item>San Marcel</item>
+        <item>Capitalia</item>
+    </string-array>
+
+    <string name="next">Siguiente</string>
+    <string name="previous">Anterior</string>
+    <string name="lorem_ipsum">Texto de prueba largo...</string>
+    <string name="action_settings">Configuración</string>
+    <string name="first_fragment_label">Primer Fragmento</string>
+    <string name="second_fragment_label">Segundo Fragmento</string>
 </resources>
