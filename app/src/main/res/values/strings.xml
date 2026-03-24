@@ -43,6 +43,7 @@
     <string name="need_missing_list">Importe el archivo de faltantes</string>
     <string name="need_sede">Seleccione la sede</string>
     <string name="export_nothing">No hay reporte para exportar</string>
+    <string name="export_saved_downloads">Guardado en Descargas/%1$s (también puede compartir)</string>
     <string name="export_io_error">Error al generar el archivo</string>
     <string name="export_chooser">Compartir reporte</string>
     <string name="export_chooser_three_files">Compartir 3 reportes (.xls)</string>

@@ -20,8 +20,8 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.FileProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -30,7 +30,6 @@ import com.rscja.deviceapi.entity.InventoryParameter;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 import com.rscja.deviceapi.interfaces.IUHFInventoryCallback;
 
-import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -321,12 +320,12 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         for (MasterRecord r : masterRecordsAll) {
-            if (SedeMatcher.matches(r, sede)) {
+            if (recordMatchesSelectedSede(r, sede)) {
                 forList.add(r);
             }
         }
         for (Map.Entry<String, MasterRecord> e : masterByRfidAll.entrySet()) {
-            if (SedeMatcher.matches(e.getValue(), sede)) {
+            if (recordMatchesSelectedSede(e.getValue(), sede)) {
                 masterByRfidFiltered.put(e.getKey(), e.getValue());
             }
         }
@@ -337,6 +336,22 @@ public class MainActivity extends AppCompatActivity {
     private String getSelectedSede() {
         Object item = spinnerSede.getSelectedItem();
         return item != null ? item.toString().trim() : "";
+    }
+
+    /** Si el maestro no trae sede, el registro cuenta para la sede elegida. */
+    private static boolean recordMatchesSelectedSede(@Nullable MasterRecord record, @NonNull String selectedSede) {
+        if (record == null) {
+            return false;
+        }
+        String sel = selectedSede.trim();
+        if (sel.isEmpty()) {
+            return false;
+        }
+        String rowSede = record.sede;
+        if (rowSede == null || rowSede.trim().isEmpty()) {
+            return true;
+        }
+        return sel.equalsIgnoreCase(rowSede.trim());
     }
 
     private void confirmNewSession() {
@@ -522,62 +537,140 @@ public class MainActivity extends AppCompatActivity {
     private void exportReports() {
         if (!sessionFinalized) return;
 
+        final AppMode mode = appMode;
+        final ReconciliationEngine.Result reconSnapshot = lastReconciliation;
+        final List<MissingSearchResultRow> missingSnapshot = lastMissingReport != null
+                ? new ArrayList<>(lastMissingReport) : null;
+
+        setLoadingOverlayVisible(true);
+        final Context appCtx = getApplicationContext();
+
+        ioExecutor.execute(() -> {
+            try {
+                String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+
+                if (mode == AppMode.RECONCILE && reconSnapshot != null) {
+                    Uri uOk = PublicDownloadsExport.insertWriteAndPublish(appCtx,
+                            "Conciliacion_Exitosos_" + stamp + ".xls",
+                            out -> ConciliationReportWriter.writeExitosos(out, reconSnapshot.exitosos));
+                    Uri uSob = PublicDownloadsExport.insertWriteAndPublish(appCtx,
+                            "Conciliacion_Sobrantes_" + stamp + ".xls",
+                            out -> ConciliationReportWriter.writeSobrantes(out, reconSnapshot.sobrantes));
+                    Uri uFal = PublicDownloadsExport.insertWriteAndPublish(appCtx,
+                            "Conciliacion_Faltantes_" + stamp + ".xls",
+                            out -> ConciliationReportWriter.writeFaltantes(out, reconSnapshot.faltantes));
+
+                    ArrayList<Uri> uris = new ArrayList<>(3);
+                    uris.add(uOk);
+                    uris.add(uSob);
+                    uris.add(uFal);
+
+                    mainHandler.post(() -> {
+                        setLoadingOverlayVisible(false);
+                        Toast.makeText(MainActivity.this,
+                                getString(R.string.export_saved_downloads, PublicDownloadsExport.DOWNLOADS_SUBFOLDER),
+                                Toast.LENGTH_LONG).show();
+                        shareExcelFilesAsChooser(uris,
+                                getString(R.string.export_subject_conciliation),
+                                getString(R.string.export_chooser_three_files));
+                    });
+                } else if (mode == AppMode.MISSING_SEARCH && missingSnapshot != null) {
+                    Uri uri = PublicDownloadsExport.insertWriteAndPublish(appCtx,
+                            "BusquedaFaltantes_" + stamp + ".xls",
+                            out -> ConciliationReportWriter.writeMissingSearchReport(out, missingSnapshot));
+                    ArrayList<Uri> one = new ArrayList<>(1);
+                    one.add(uri);
+                    mainHandler.post(() -> {
+                        setLoadingOverlayVisible(false);
+                        Toast.makeText(MainActivity.this,
+                                getString(R.string.export_saved_downloads, PublicDownloadsExport.DOWNLOADS_SUBFOLDER),
+                                Toast.LENGTH_LONG).show();
+                        shareExcelFilesAsChooser(one,
+                                getString(R.string.export_subject_missing),
+                                getString(R.string.export_chooser));
+                    });
+                } else {
+                    mainHandler.post(() -> {
+                        setLoadingOverlayVisible(false);
+                        Toast.makeText(MainActivity.this, R.string.export_nothing, Toast.LENGTH_SHORT).show();
+                    });
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "export", e);
+                mainHandler.post(() -> {
+                    setLoadingOverlayVisible(false);
+                    Toast.makeText(MainActivity.this, exportFailureMessage(e), Toast.LENGTH_LONG).show();
+                });
+            } catch (RuntimeException e) {
+                // Fallos no comprobados (p. ej. MediaStore).
+                Log.e(TAG, "export runtime", e);
+                mainHandler.post(() -> {
+                    setLoadingOverlayVisible(false);
+                    Toast.makeText(MainActivity.this, exportFailureMessage(e), Toast.LENGTH_LONG).show();
+                });
+            }
+        });
+    }
+
+    @NonNull
+    private String exportFailureMessage(@NonNull Throwable e) {
+        String base = getString(R.string.export_io_error);
+        String detail = e.getMessage();
+        if (detail == null || detail.trim().isEmpty()) {
+            detail = e.getClass().getSimpleName();
+        }
+        return base + ": " + detail;
+    }
+
+    /**
+     * Comparte uno o varios .xls con {@code content://} y permisos de lectura temporales.
+     * Para varios adjuntos el intent usa MIME comodín (mejor compatibilidad con Gmail/Drive).
+     */
+    private void shareExcelFilesAsChooser(@NonNull ArrayList<Uri> uris,
+            @NonNull String subject, @NonNull String chooserTitle) {
+        if (uris.isEmpty()) {
+            return;
+        }
+        int readFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION;
+
+        if (uris.size() == 1) {
+            Uri uri = uris.get(0);
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType("application/vnd.ms-excel");
+            send.putExtra(Intent.EXTRA_STREAM, uri);
+            send.putExtra(Intent.EXTRA_SUBJECT, subject);
+            send.setClipData(ClipData.newUri(getContentResolver(), subject, uri));
+            send.addFlags(readFlags);
+            Intent chooser = Intent.createChooser(send, chooserTitle);
+            chooser.addFlags(readFlags);
+            try {
+                startActivity(chooser);
+            } catch (android.content.ActivityNotFoundException ex) {
+                Log.w(TAG, "share", ex);
+                Toast.makeText(this, R.string.export_io_error, Toast.LENGTH_SHORT).show();
+            }
+            return;
+        }
+
+        Intent send = new Intent(Intent.ACTION_SEND_MULTIPLE);
+        send.setType("*/*");
+        send.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
+        send.putExtra(Intent.EXTRA_SUBJECT, subject);
+        ClipData clip = new ClipData(
+                subject,
+                new String[] {"*/*"},
+                new ClipData.Item(uris.get(0)));
+        for (int i = 1; i < uris.size(); i++) {
+            clip.addItem(new ClipData.Item(uris.get(i)));
+        }
+        send.setClipData(clip);
+        send.addFlags(readFlags);
+        Intent chooser = Intent.createChooser(send, chooserTitle);
+        chooser.addFlags(readFlags);
         try {
-            File dir = new File(getCacheDir(), "exports");
-            if (!dir.isDirectory() && !dir.mkdirs()) {
-                throw new IOException("mkdirs");
-            }
-            String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-            String authority = getPackageName() + ".fileprovider";
-
-            if (appMode == AppMode.RECONCILE && lastReconciliation != null) {
-                File fOk = new File(dir, "Conciliacion_Exitosos_" + stamp + ".xls");
-                File fSob = new File(dir, "Conciliacion_Sobrantes_" + stamp + ".xls");
-                File fFal = new File(dir, "Conciliacion_Faltantes_" + stamp + ".xls");
-                ConciliationReportWriter.writeExitosos(fOk, lastReconciliation.exitosos);
-                ConciliationReportWriter.writeSobrantes(fSob, lastReconciliation.sobrantes);
-                ConciliationReportWriter.writeFaltantes(fFal, lastReconciliation.faltantes);
-
-                ArrayList<Uri> uris = new ArrayList<>(3);
-                uris.add(FileProvider.getUriForFile(this, authority, fOk));
-                uris.add(FileProvider.getUriForFile(this, authority, fSob));
-                uris.add(FileProvider.getUriForFile(this, authority, fFal));
-
-                String subject = getString(R.string.export_subject_conciliation);
-                Intent send = new Intent(Intent.ACTION_SEND_MULTIPLE);
-                send.setType("application/vnd.ms-excel");
-                send.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
-                send.putExtra(Intent.EXTRA_SUBJECT, subject);
-                ClipData clip = new ClipData(
-                        subject,
-                        new String[] {"application/vnd.ms-excel"},
-                        new ClipData.Item(uris.get(0)));
-                clip.addItem(new ClipData.Item(uris.get(1)));
-                clip.addItem(new ClipData.Item(uris.get(2)));
-                send.setClipData(clip);
-                send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                Intent chooser = Intent.createChooser(send, getString(R.string.export_chooser_three_files));
-                chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                startActivity(chooser);
-            } else if (appMode == AppMode.MISSING_SEARCH && lastMissingReport != null) {
-                File out = new File(dir, "BusquedaFaltantes_" + stamp + ".xls");
-                ConciliationReportWriter.writeMissingSearchReport(out, lastMissingReport);
-                String subject = getString(R.string.export_subject_missing);
-                Uri uri = FileProvider.getUriForFile(this, authority, out);
-                Intent send = new Intent(Intent.ACTION_SEND);
-                send.setType("application/vnd.ms-excel");
-                send.putExtra(Intent.EXTRA_STREAM, uri);
-                send.putExtra(Intent.EXTRA_SUBJECT, subject);
-                send.setClipData(ClipData.newUri(getContentResolver(), subject, uri));
-                send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                Intent chooser = Intent.createChooser(send, getString(R.string.export_chooser));
-                chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                startActivity(chooser);
-            } else {
-                Toast.makeText(this, R.string.export_nothing, Toast.LENGTH_SHORT).show();
-            }
-        } catch (IOException e) {
-            Log.e(TAG, "export", e);
+            startActivity(chooser);
+        } catch (android.content.ActivityNotFoundException ex) {
+            Log.w(TAG, "share multiple", ex);
             Toast.makeText(this, R.string.export_io_error, Toast.LENGTH_SHORT).show();
         }
     }
