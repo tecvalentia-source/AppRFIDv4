@@ -2,6 +2,14 @@
 <resources>
     <string name="app_name">Confa App RFID</string>
 
+    <string name="menu_title_rfid_confa">RFID Confa</string>
+    <string name="menu_scan_assets">Escaneo (Busqueda de activos)</string>
+    <string name="menu_scan_individual">Escaneo individual</string>
+    <string name="menu_filter_individual">Filtro individual</string>
+    <string name="menu_bulk_read">Lectura masiva</string>
+    <string name="menu_soon">Próximamente</string>
+    <string name="menu_logo_content_description">Logo Confa</string>
+
     <string name="scan_name_label">Nombre del escaneo</string>
     <string name="scan_name_hint">Ej: PrimerEscaneo, InventarioMarzo</string>
     <string name="need_scan_name">Escriba el nombre del escaneo</string>

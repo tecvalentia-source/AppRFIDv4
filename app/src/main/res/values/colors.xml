@@ -2,4 +2,14 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Menú principal (pantalla de inicio) -->
+    <color name="menu_background_blue">#00AEEF</color>
+    <color name="menu_brand_blue">#00AEEF</color>
+    <color name="menu_card_white">#FFFFFF</color>
+    <color name="menu_card_yellow">#E8C547</color>
+    <color name="menu_card_lime">#C4E538</color>
+    <color name="menu_card_orange">#FF8A34</color>
+    <color name="menu_text_on_white">#00AEEF</color>
+    <color name="menu_text_on_colored">#FFFFFF</color>
 </resources>

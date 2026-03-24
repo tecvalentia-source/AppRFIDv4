@@ -6,4 +6,10 @@
     </style>
 
     <style name="Theme.AppRFID" parent="Base.Theme.AppRFID" />
+
+    <style name="Theme.AppRFID.MenuPrincipal" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@color/menu_background_blue</item>
+        <item name="android:navigationBarColor">@color/menu_background_blue</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 </resources>
