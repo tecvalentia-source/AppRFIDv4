@@ -9,32 +9,58 @@ public class ReconciliationEngine {
 
     public static class Result {
         public List<MasterRecord> exitosos = new ArrayList<>();
-        public List<String> sobrantes = new ArrayList<>(); // RFIDs no en el maestro
-        public List<MasterRecord> faltantes = new ArrayList<>(); // En maestro pero no escaneados
+        public List<SobranteRow> sobrantes = new ArrayList<>();
+        public List<MasterRecord> faltantes = new ArrayList<>();
     }
 
-    public static Result compute(Map<String, MasterRecord> masterMap, Set<String> scannedNorm, Map<String, String> rawMap, String sede) {
+    /**
+     * Conciliación por sede usando la columna {@link MasterRecord#ubicacion} del maestro.
+     *
+     * @param masterByRfid mapa completo EPC normalizado → registro (una fila por EPC)
+     * @param scannedNorm  EPC únicos leídos (normalizados)
+     * @param rawMap       EPC normalizado → hex/string mostrado
+     * @param sedeSpinner  texto de sede seleccionada en la app (ej. Capitalia)
+     */
+    public static Result compute(Map<String, MasterRecord> masterByRfid,
+            Set<String> scannedNorm,
+            Map<String, String> rawMap,
+            String sedeSpinner) {
         Result result = new Result();
+        String sede = UbicacionMatcher.normalizeToken(sedeSpinner);
 
-        // 1. Encontrar Exitosos y Faltantes (RFID del maestro normalizado como en el escaneo)
-        for (MasterRecord record : masterMap.values()) {
-            String norm = RfidNormalizer.normalize(record.rfid);
-            if (norm.isEmpty()) {
+        for (Map.Entry<String, MasterRecord> e : masterByRfid.entrySet()) {
+            String norm = e.getKey();
+            MasterRecord rec = e.getValue();
+            if (rec == null || norm.isEmpty()) {
                 continue;
             }
-            if (scannedNorm.contains(norm)) {
-                result.exitosos.add(record);
-            } else {
-                result.faltantes.add(record);
+            boolean inSede = UbicacionMatcher.matchesSelectedSede(rec.ubicacion, sede);
+            boolean read = scannedNorm.contains(norm);
+
+            if (inSede && read) {
+                result.exitosos.add(rec);
+            } else if (inSede) {
+                result.faltantes.add(rec);
             }
         }
 
-        // 2. Encontrar Sobrantes (lo que escaneaste que no estaba en el maestro)
         for (String norm : scannedNorm) {
-            if (!masterMap.containsKey(norm)) {
-                result.sobrantes.add(rawMap.get(norm));
+            String raw = rawMap != null ? rawMap.get(norm) : norm;
+            if (raw == null || raw.isEmpty()) {
+                raw = norm;
+            }
+            MasterRecord rec = masterByRfid.get(norm);
+            if (rec == null) {
+                result.sobrantes.add(new SobranteRow(raw, SobranteRow.MOTIVO_NO_EN_MAESTRO, null));
+                continue;
+            }
+            if (!UbicacionMatcher.matchesSelectedSede(rec.ubicacion, sede)) {
+                String ubi = UbicacionMatcher.normalizeToken(rec.ubicacion);
+                result.sobrantes.add(new SobranteRow(raw, SobranteRow.MOTIVO_OTRA_UBICACION,
+                        ubi.isEmpty() ? "(vacío)" : ubi));
             }
         }
+
         return result;
     }
 }

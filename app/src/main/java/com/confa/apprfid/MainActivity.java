@@ -1,18 +1,23 @@
 package com.confa.apprfid;
 
+import android.Manifest;
 import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -20,8 +25,8 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -65,9 +70,14 @@ public class MainActivity extends AppCompatActivity {
             registerForActivityResult(new OpenDocumentPersistable(), this::onMasterDocumentPicked);
     private final ActivityResultLauncher<String[]> pickMissingLauncher =
             registerForActivityResult(new OpenDocumentPersistable(), this::onMissingDocumentPicked);
+    private final ActivityResultLauncher<String[]> requestLocationForExport =
+            registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(),
+                    result -> executeExportDownloadTask());
 
     private RFIDWithUHFUART mReader;
     private boolean inventoryRunning;
+
+    private EditText etScanName;
 
     private Spinner spinnerSede;
     private Spinner spinnerMode;
@@ -145,6 +155,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        etScanName = findViewById(R.id.etScanName);
+
         spinnerSede = findViewById(R.id.spinnerSede);
         spinnerMode = findViewById(R.id.spinnerMode);
         btnImportMaster = findViewById(R.id.btnImportMaster);
@@ -212,6 +224,21 @@ public class MainActivity extends AppCompatActivity {
         btnFinalize.setOnClickListener(v -> finalizeSession());
         btnExportReports.setOnClickListener(v -> exportReports());
 
+        etScanName.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                refreshActionStates();
+            }
+        });
+
         try {
             mReader = RFIDWithUHFUART.getInstance();
             if (mReader != null && !mReader.init(this)) {
@@ -252,6 +279,12 @@ public class MainActivity extends AppCompatActivity {
                         Toast.makeText(MainActivity.this,
                                 getString(R.string.import_ok, masterRecordsAll.size(), result.duplicateCount),
                                 Toast.LENGTH_LONG).show();
+                        if (!masterRecordsAll.isEmpty() && masterByRfidFiltered.isEmpty()) {
+                            Toast.makeText(MainActivity.this,
+                                    getString(R.string.import_ok_filtered_empty,
+                                            masterRecordsAll.size(), getSelectedSede()),
+                                    Toast.LENGTH_LONG).show();
+                        }
                         refreshActionStates();
                     }
 
@@ -320,12 +353,12 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         for (MasterRecord r : masterRecordsAll) {
-            if (recordMatchesSelectedSede(r, sede)) {
+            if (UbicacionMatcher.matchesSelectedSede(r.ubicacion, sede)) {
                 forList.add(r);
             }
         }
         for (Map.Entry<String, MasterRecord> e : masterByRfidAll.entrySet()) {
-            if (recordMatchesSelectedSede(e.getValue(), sede)) {
+            if (UbicacionMatcher.matchesSelectedSede(e.getValue().ubicacion, sede)) {
                 masterByRfidFiltered.put(e.getKey(), e.getValue());
             }
         }
@@ -338,20 +371,16 @@ public class MainActivity extends AppCompatActivity {
         return item != null ? item.toString().trim() : "";
     }
 
-    /** Si el maestro no trae sede, el registro cuenta para la sede elegida. */
-    private static boolean recordMatchesSelectedSede(@Nullable MasterRecord record, @NonNull String selectedSede) {
-        if (record == null) {
-            return false;
+    @NonNull
+    private String getScanNameTrimmed() {
+        if (etScanName == null) {
+            return "";
         }
-        String sel = selectedSede.trim();
-        if (sel.isEmpty()) {
-            return false;
-        }
-        String rowSede = record.sede;
-        if (rowSede == null || rowSede.trim().isEmpty()) {
-            return true;
-        }
-        return sel.equalsIgnoreCase(rowSede.trim());
+        return etScanName.getText() != null ? etScanName.getText().toString().trim() : "";
+    }
+
+    private boolean hasScanName() {
+        return !getScanNameTrimmed().isEmpty();
     }
 
     private void confirmNewSession() {
@@ -379,6 +408,9 @@ public class MainActivity extends AppCompatActivity {
         missingOrderRaw = new ArrayList<>();
         missingTargetKeys.clear();
         masterAdapter.setItems(new ArrayList<>());
+        if (etScanName != null) {
+            etScanName.setText("");
+        }
 
         tvCounterUnique.setText(getString(R.string.counter_unique, 0));
         tvCounterTotal.setText(getString(R.string.counter_total, 0));
@@ -392,6 +424,10 @@ public class MainActivity extends AppCompatActivity {
     private void startScanning() {
         if (mReader == null || inventoryRunning || sessionFinalized) return;
 
+        if (!hasScanName()) {
+            Toast.makeText(this, R.string.need_scan_name, Toast.LENGTH_SHORT).show();
+            return;
+        }
         String sede = getSelectedSede();
         if (sede.isEmpty()) {
             Toast.makeText(this, R.string.need_sede, Toast.LENGTH_SHORT).show();
@@ -456,6 +492,10 @@ public class MainActivity extends AppCompatActivity {
 
     private void resumeScanning() {
         if (mReader == null || inventoryRunning || sessionFinalized) return;
+        if (!hasScanName()) {
+            Toast.makeText(this, R.string.need_scan_name, Toast.LENGTH_SHORT).show();
+            return;
+        }
         String sede = getSelectedSede();
         if (sede.isEmpty()) {
             Toast.makeText(this, R.string.need_sede, Toast.LENGTH_SHORT).show();
@@ -492,12 +532,17 @@ public class MainActivity extends AppCompatActivity {
             refreshActionStates();
             return;
         }
+        if (!hasScanName()) {
+            Toast.makeText(this, R.string.need_scan_name, Toast.LENGTH_SHORT).show();
+            refreshActionStates();
+            return;
+        }
 
         tvScanStatus.setText(R.string.finalize_processing);
         btnFinalize.setEnabled(false);
 
         if (appMode == AppMode.RECONCILE) {
-            final Map<String, MasterRecord> masterSnapshot = new HashMap<>(masterByRfidFiltered);
+            final Map<String, MasterRecord> masterSnapshot = new HashMap<>(masterByRfidAll);
             ioExecutor.execute(() -> {
                 Set<String> scanCopy = new HashSet<>(scannedNormalized);
                 Map<String, String> rawCopy = new HashMap<>(scannedRawByNorm);
@@ -534,31 +579,65 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private boolean hasLocationPermission() {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
     private void exportReports() {
         if (!sessionFinalized) return;
+        if (!hasScanName()) {
+            Toast.makeText(this, R.string.need_scan_name, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!hasLocationPermission()) {
+            requestLocationForExport.launch(new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION});
+            return;
+        }
+        executeExportDownloadTask();
+    }
+
+    /**
+     * Coordenadas GPS: se obtienen una vez al exportar (no por cada EPC), en segundo plano.
+     */
+    private void executeExportDownloadTask() {
+        if (!sessionFinalized) return;
+        if (!hasScanName()) {
+            Toast.makeText(this, R.string.need_scan_name, Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         final AppMode mode = appMode;
         final ReconciliationEngine.Result reconSnapshot = lastReconciliation;
         final List<MissingSearchResultRow> missingSnapshot = lastMissingReport != null
                 ? new ArrayList<>(lastMissingReport) : null;
+        final String sede = getSelectedSede();
+        final String scanSan = ExportFileNamer.sanitizeScanName(getScanNameTrimmed());
+        final String prefix = SedePrefix.forSedeDisplayName(sede);
+        final String dateYyyyMmDd = new SimpleDateFormat("yyyyMMdd", Locale.US).format(new Date());
 
         setLoadingOverlayVisible(true);
         final Context appCtx = getApplicationContext();
 
         ioExecutor.execute(() -> {
             try {
-                String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+                String coord = ExportLocationHelper.getCoordinatesForExport(appCtx);
 
                 if (mode == AppMode.RECONCILE && reconSnapshot != null) {
-                    Uri uOk = PublicDownloadsExport.insertWriteAndPublish(appCtx,
-                            "Conciliacion_Exitosos_" + stamp + ".xls",
-                            out -> ConciliationReportWriter.writeExitosos(out, reconSnapshot.exitosos));
-                    Uri uSob = PublicDownloadsExport.insertWriteAndPublish(appCtx,
-                            "Conciliacion_Sobrantes_" + stamp + ".xls",
-                            out -> ConciliationReportWriter.writeSobrantes(out, reconSnapshot.sobrantes));
-                    Uri uFal = PublicDownloadsExport.insertWriteAndPublish(appCtx,
-                            "Conciliacion_Faltantes_" + stamp + ".xls",
-                            out -> ConciliationReportWriter.writeFaltantes(out, reconSnapshot.faltantes));
+                    String nOk = ExportFileNamer.buildFileName(prefix, scanSan, dateYyyyMmDd, "EXI");
+                    String nSob = ExportFileNamer.buildFileName(prefix, scanSan, dateYyyyMmDd, "SOB");
+                    String nFal = ExportFileNamer.buildFileName(prefix, scanSan, dateYyyyMmDd, "FALT");
+
+                    Uri uOk = PublicDownloadsExport.insertWriteAndPublish(appCtx, nOk,
+                            out -> ConciliationReportWriter.writeExitosos(out, reconSnapshot.exitosos, coord));
+                    Uri uSob = PublicDownloadsExport.insertWriteAndPublish(appCtx, nSob,
+                            out -> ConciliationReportWriter.writeSobrantes(out, reconSnapshot.sobrantes, coord));
+                    Uri uFal = PublicDownloadsExport.insertWriteAndPublish(appCtx, nFal,
+                            out -> ConciliationReportWriter.writeFaltantes(out, reconSnapshot.faltantes, coord));
 
                     ArrayList<Uri> uris = new ArrayList<>(3);
                     uris.add(uOk);
@@ -575,9 +654,9 @@ public class MainActivity extends AppCompatActivity {
                                 getString(R.string.export_chooser_three_files));
                     });
                 } else if (mode == AppMode.MISSING_SEARCH && missingSnapshot != null) {
-                    Uri uri = PublicDownloadsExport.insertWriteAndPublish(appCtx,
-                            "BusquedaFaltantes_" + stamp + ".xls",
-                            out -> ConciliationReportWriter.writeMissingSearchReport(out, missingSnapshot));
+                    String nBus = ExportFileNamer.buildFileName(prefix, scanSan, dateYyyyMmDd, "BUSQFAL");
+                    Uri uri = PublicDownloadsExport.insertWriteAndPublish(appCtx, nBus,
+                            out -> ConciliationReportWriter.writeMissingSearchReport(out, missingSnapshot, coord));
                     ArrayList<Uri> one = new ArrayList<>(1);
                     one.add(uri);
                     mainHandler.post(() -> {
@@ -602,7 +681,6 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(MainActivity.this, exportFailureMessage(e), Toast.LENGTH_LONG).show();
                 });
             } catch (RuntimeException e) {
-                // Fallos no comprobados (p. ej. MediaStore).
                 Log.e(TAG, "export runtime", e);
                 mainHandler.post(() -> {
                     setLoadingOverlayVisible(false);
@@ -687,32 +765,46 @@ public class MainActivity extends AppCompatActivity {
 
     private void refreshActionStates() {
         boolean masterReady = !masterByRfidAll.isEmpty() && !masterByRfidFiltered.isEmpty();
+        boolean scanOk = hasScanName();
         boolean prereq = !getSelectedSede().isEmpty()
                 && (appMode == AppMode.RECONCILE ? masterReady : !missingTargetKeys.isEmpty());
-        boolean canStart = !inventoryRunning && !sessionFinalized && prereq && !scanSessionStarted;
+        boolean canStart = !inventoryRunning && !sessionFinalized && prereq && !scanSessionStarted && scanOk;
 
-        btnStartScan.setEnabled(canStart);
-        btnPause.setEnabled(inventoryRunning);
-        btnResume.setEnabled(!inventoryRunning && !sessionFinalized && prereq && scanSessionStarted);
+        enableIfChanged(btnStartScan, canStart);
+        enableIfChanged(btnPause, inventoryRunning);
+        enableIfChanged(btnResume, !inventoryRunning && !sessionFinalized && prereq && scanSessionStarted && scanOk);
         boolean canFinalize = !sessionFinalized
+                && scanOk
                 && !getSelectedSede().isEmpty()
                 && (appMode == AppMode.RECONCILE
                 ? masterReady
                 : !missingTargetKeys.isEmpty());
-        btnFinalize.setEnabled(canFinalize);
+        enableIfChanged(btnFinalize, canFinalize);
 
-        boolean canExport = sessionFinalized
+        boolean canExport = sessionFinalized && scanOk
                 && ((appMode == AppMode.RECONCILE && lastReconciliation != null)
                 || (appMode == AppMode.MISSING_SEARCH && lastMissingReport != null));
-        btnExportReports.setEnabled(canExport);
+        enableIfChanged(btnExportReports, canExport);
 
-        btnImportMaster.setEnabled(!inventoryRunning && !sessionFinalized);
-        btnImportMissing.setEnabled(!inventoryRunning && !sessionFinalized);
-        spinnerMode.setEnabled(!inventoryRunning && !sessionFinalized);
-        spinnerSede.setEnabled(!inventoryRunning && !sessionFinalized);
+        boolean editingAllowed = !inventoryRunning && !sessionFinalized;
+        enableIfChanged(btnImportMaster, editingAllowed);
+        enableIfChanged(btnImportMissing, editingAllowed);
+        enableIfChanged(spinnerMode, editingAllowed);
+        enableIfChanged(spinnerSede, editingAllowed);
+        enableIfChanged(etScanName, editingAllowed);
 
         if (!sessionFinalized) {
             updateScanStatusIdle();
+        }
+    }
+
+    /**
+     * Evita llamar {@link View#setEnabled(boolean)} en cada tecla: en algunos equipos industrial eso
+     * reinicia el IME y bloquea borrar o editar el texto.
+     */
+    private static void enableIfChanged(View v, boolean enabled) {
+        if (v != null && v.isEnabled() != enabled) {
+            v.setEnabled(enabled);
         }
     }
 

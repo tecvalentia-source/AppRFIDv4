@@ -21,6 +21,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.StringReader;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.ArrayList;
@@ -28,10 +30,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Maestro: CSV / TXT (coma, punto y coma o tabulador), Excel .xlsx o Excel 2003 XML (SpreadsheetML).
  * Columnas esperadas: RFID, Ubicación, Responsable; opcional: Sede.
+ * <p>
+ * Lista de faltantes: mismos CSV/TXT/.xlsx/XML, más archivos {@code .xls} generados por esta app
+ * (tabla HTML con columna RFID), p. ej. el reporte BUSQFAL exportado.
  */
 public final class MasterTableParser {
 
@@ -90,7 +97,22 @@ public final class MasterTableParser {
             }
         }
 
-        BufferedReader probe = new BufferedReader(new InputStreamReader(bin, StandardCharsets.UTF_8), 64 * 1024);
+        Charset textCharset = StandardCharsets.UTF_8;
+        bin.mark(8);
+        byte[] bomProbe = new byte[4];
+        int bomN = bin.read(bomProbe);
+        bin.reset();
+        if (bomN >= 3 && bomProbe[0] == (byte) 0xEF && bomProbe[1] == (byte) 0xBB && bomProbe[2] == (byte) 0xBF) {
+            bin.skip(3);
+        } else if (bomN >= 2 && bomProbe[0] == (byte) 0xFF && bomProbe[1] == (byte) 0xFE) {
+            textCharset = StandardCharsets.UTF_16LE;
+            bin.skip(2);
+        } else if (bomN >= 2 && bomProbe[0] == (byte) 0xFE && bomProbe[1] == (byte) 0xFF) {
+            textCharset = StandardCharsets.UTF_16BE;
+            bin.skip(2);
+        }
+
+        BufferedReader probe = new BufferedReader(new InputStreamReader(bin, textCharset), 64 * 1024);
         probe.mark(256 * 1024);
         char[] buf = new char[4096];
         int n = probe.read(buf);
@@ -99,53 +121,121 @@ public final class MasterTableParser {
             throw new ParseException("El archivo está vacío.");
         }
         String head = stripUtf8Bom(new String(buf, 0, Math.min(n, buf.length)).trim());
-        if (head.startsWith("<?xml") || head.startsWith("<")) {
+        boolean looksXml = head.startsWith("<?xml")
+                || head.startsWith("<")
+                || containsIgnoreCase(head, "<Workbook")
+                || containsIgnoreCase(head, "<ss:Workbook");
+        if (looksXml) {
             return parseFromExcelXmlRows(readExcelXmlRows(probe), fileHint);
         }
         return parseCsvMaster(probe, fileHint);
     }
 
+    private static final Pattern HTML_TR = Pattern.compile("(?is)<tr\\b[^>]*>(.*?)</tr>");
+    private static final Pattern HTML_TD_TH = Pattern.compile("(?is)<t[dh]\\b[^>]*>(.*?)</t[dh]>");
+
     @NonNull
     public static List<String> parseMissingList(@NonNull InputStream in, @Nullable String fileHint)
             throws IOException, ParseException {
         BufferedInputStream bin = new BufferedInputStream(in, 128 * 1024);
-        bin.mark(8);
-        byte[] sig4 = new byte[4];
-        int sigN = bin.read(sig4);
-        bin.reset();
-        if (sigN < 0) {
+        byte[] data = readStreamFullyCapped(bin, MAX_IMPORT_BYTES);
+        if (data.length == 0) {
             throw new ParseException("El archivo está vacío.");
         }
-        boolean zip = sigN >= 2 && sig4[0] == 0x50 && sig4[1] == 0x4B;
-        if (zip) {
-            try {
-                byte[] data = readStreamFullyCapped(bin, MAX_IMPORT_BYTES);
-                try (ByteArrayInputStream bais = new ByteArrayInputStream(data)) {
-                    return parseMissingFromExcelXml(readXlsxRows(bais));
-                }
+        if (data.length >= 2 && data[0] == 0x50 && data[1] == 0x4B) {
+            try (ByteArrayInputStream bais = new ByteArrayInputStream(data)) {
+                return parseMissingFromExcelXml(readXlsxRows(bais));
             } catch (ParseException e) {
                 throw e;
             } catch (IOException e) {
                 throw new ParseException("No se pudo leer el archivo Excel (.xlsx).", e);
             } catch (Exception e) {
                 throw new ParseException(
-                        "No es un Excel .xlsx válido para la lista de faltantes. Use CSV o TXT.", e);
+                        "No es un Excel .xlsx válido para la lista de faltantes.", e);
             }
         }
 
-        BufferedReader probe = new BufferedReader(new InputStreamReader(bin, StandardCharsets.UTF_8), 64 * 1024);
-        probe.mark(256 * 1024);
-        char[] buf = new char[4096];
-        int n = probe.read(buf);
-        probe.reset();
-        if (n <= 0) {
-            throw new ParseException("El archivo está vacío.");
+        String text = stripUtf8Bom(new String(data, StandardCharsets.UTF_8));
+        if (looksLikeHtmlTableExport(text)) {
+            return parseMissingFromHtmlTable(text);
         }
-        String head = stripUtf8Bom(new String(buf, 0, Math.min(n, buf.length)).trim());
-        if (head.startsWith("<?xml") || head.startsWith("<")) {
-            return parseMissingFromExcelXml(readExcelXmlRows(probe));
+        String trim = text.trim();
+        if (trim.startsWith("<?xml") || trim.startsWith("<")) {
+            try {
+                return parseMissingFromExcelXml(
+                        readExcelXmlRows(new BufferedReader(new StringReader(text))));
+            } catch (ParseException e) {
+                // No es SpreadsheetML; continuar como CSV/TXT
+            }
         }
-        return parseMissingCsv(probe);
+        return parseMissingCsv(new BufferedReader(new StringReader(text)));
+    }
+
+    /** Exportación de la app: .xls con tabla HTML ({@link ConciliationReportWriter}). */
+    private static boolean looksLikeHtmlTableExport(@NonNull String text) {
+        String u = text.toLowerCase(Locale.ROOT);
+        return u.contains("<html") || (u.contains("<table") && u.contains("<tr"));
+    }
+
+    @NonNull
+    private static List<String> parseMissingFromHtmlTable(@NonNull String html) throws ParseException {
+        Matcher trM = HTML_TR.matcher(html);
+        List<String> out = new ArrayList<>();
+        boolean first = true;
+        while (trM.find()) {
+            String rowInner = trM.group(1);
+            List<String> rawCells = extractHtmlRowCells(rowInner);
+            if (rawCells.isEmpty()) {
+                continue;
+            }
+            String col0 = stripHtmlToText(rawCells.get(0));
+            if (col0.isEmpty()) {
+                continue;
+            }
+            if (first && looksLikeMissingHeader(col0)) {
+                first = false;
+                continue;
+            }
+            first = false;
+            String norm = RfidNormalizer.normalize(col0);
+            if (!norm.isEmpty()) {
+                out.add(col0.trim());
+            }
+        }
+        if (out.isEmpty()) {
+            throw new ParseException("No se encontraron RFID en el archivo .xls/HTML. "
+                    + "Use el exportado por la app o una columna RFID.");
+        }
+        return out;
+    }
+
+    @NonNull
+    private static List<String> extractHtmlRowCells(@NonNull String trInner) {
+        List<String> list = new ArrayList<>();
+        Matcher m = HTML_TD_TH.matcher(trInner);
+        while (m.find()) {
+            list.add(m.group(1));
+        }
+        return list;
+    }
+
+    @NonNull
+    private static String stripHtmlToText(@Nullable String htmlCell) {
+        if (htmlCell == null) {
+            return "";
+        }
+        String t = htmlCell.replaceAll("(?s)<[^>]+>", " ");
+        return decodeBasicHtmlEntities(t).replaceAll("\\s+", " ").trim();
+    }
+
+    @NonNull
+    private static String decodeBasicHtmlEntities(@NonNull String s) {
+        return s.replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"")
+                .replace("&#39;", "'")
+                .replace("&nbsp;", " ");
     }
 
     private static byte[] readStreamFullyCapped(InputStream in, int maxBytes) throws IOException, ParseException {
@@ -209,6 +299,25 @@ public final class MasterTableParser {
         }
     }
 
+    /** Coincide con {@code Row}, {@code ss:Row}, etc. (SpreadsheetML con prefijos). */
+    private static boolean spreadsheetTagEquals(@Nullable String tagName, String localName) {
+        if (tagName == null) {
+            return false;
+        }
+        if (localName.equalsIgnoreCase(tagName)) {
+            return true;
+        }
+        int colon = tagName.indexOf(':');
+        if (colon >= 0 && colon < tagName.length() - 1) {
+            return localName.equalsIgnoreCase(tagName.substring(colon + 1));
+        }
+        return false;
+    }
+
+    private static boolean containsIgnoreCase(String haystack, String needle) {
+        return haystack != null && haystack.toLowerCase(Locale.ROOT).contains(needle.toLowerCase(Locale.ROOT));
+    }
+
     private static List<List<String>> pullSpreadsheetRows(XmlPullParser parser)
             throws XmlPullParserException, IOException {
         List<List<String>> rows = new ArrayList<>();
@@ -220,11 +329,11 @@ public final class MasterTableParser {
             String name = parser.getName();
             switch (event) {
                 case XmlPullParser.START_TAG:
-                    if ("Row".equalsIgnoreCase(name)) {
+                    if (spreadsheetTagEquals(name, "Row")) {
                         row = new ArrayList<>();
-                    } else if (row != null && "Cell".equalsIgnoreCase(name)) {
+                    } else if (row != null && spreadsheetTagEquals(name, "Cell")) {
                         cellBuf = new StringBuilder();
-                    } else if (row != null && "Data".equalsIgnoreCase(name)) {
+                    } else if (row != null && spreadsheetTagEquals(name, "Data")) {
                         inData = true;
                     }
                     break;
@@ -237,12 +346,12 @@ public final class MasterTableParser {
                     }
                     break;
                 case XmlPullParser.END_TAG:
-                    if ("Data".equalsIgnoreCase(name)) {
+                    if (spreadsheetTagEquals(name, "Data")) {
                         inData = false;
-                    } else if ("Cell".equalsIgnoreCase(name) && row != null) {
+                    } else if (spreadsheetTagEquals(name, "Cell") && row != null) {
                         row.add(cellBuf != null ? cellBuf.toString().trim() : "");
                         cellBuf = null;
-                    } else if ("Row".equalsIgnoreCase(name) && row != null) {
+                    } else if (spreadsheetTagEquals(name, "Row") && row != null) {
                         if (!isRowEmpty(row)) {
                             rows.add(row);
                         }
@@ -319,9 +428,19 @@ public final class MasterTableParser {
         int start = 0;
         List<String> first = rows.get(0);
         if (first != null && !first.isEmpty()) {
-            String h = normHeader(first.get(0));
-            if (h.contains("rfid") || h.contains("epc") || h.contains("tag") || h.contains("codigo")) {
-                start = 1;
+            for (int c = 0; c < first.size(); c++) {
+                String h = normHeader(getCell(first, c));
+                if (h.contains("rfid") || h.contains("epc") || h.contains("tag") || h.contains("codigo")) {
+                    colRfid = c;
+                    start = 1;
+                    break;
+                }
+            }
+            if (start == 0) {
+                String h0 = normHeader(getCell(first, 0));
+                if (h0.contains("rfid") || h0.contains("epc") || h0.contains("tag") || h0.contains("codigo")) {
+                    start = 1;
+                }
             }
         }
         List<String> out = new ArrayList<>(rows.size());

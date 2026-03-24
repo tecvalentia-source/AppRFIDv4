@@ -17,19 +17,21 @@ public final class ConciliationReportWriter {
     private ConciliationReportWriter() {
     }
 
-    public static void writeExitosos(File file, List<MasterRecord> data) throws IOException {
+    public static void writeExitosos(File file, List<MasterRecord> data, String coordenadas) throws IOException {
         try (FileOutputStream fos = new FileOutputStream(file);
              BufferedOutputStream bos = new BufferedOutputStream(fos, 16 * 1024)) {
-            writeExitosos(bos, data);
+            writeExitosos(bos, data, coordenadas);
         }
         if (!file.isFile() || file.length() == 0L) {
             throw new IOException("Archivo de reporte vacío o no creado");
         }
     }
 
-    public static void writeExitosos(OutputStream out, List<MasterRecord> data) throws IOException {
-        String[] headers = {"RFID", "Ubicacion", "Responsable", "Sede"};
+    public static void writeExitosos(OutputStream out, List<MasterRecord> data, String coordenadas)
+            throws IOException {
+        String[] headers = {"RFID", "Ubicacion", "Responsable", "Sede", "Coordenadas"};
         List<String[]> rows = new ArrayList<>();
+        String c = safeCoord(coordenadas);
         if (data != null) {
             for (MasterRecord rec : data) {
                 if (rec == null) {
@@ -39,47 +41,59 @@ public final class ConciliationReportWriter {
                         safe(rec.rfid),
                         safe(rec.ubicacion),
                         safe(rec.responsable),
-                        safe(rec.sede)
+                        safe(rec.sede),
+                        c
                 });
             }
         }
         writeHtmlSpreadsheet(out, "Exitosos", headers, rows);
     }
 
-    public static void writeSobrantes(File file, List<String> data) throws IOException {
+    public static void writeSobrantes(File file, List<SobranteRow> data, String coordenadas) throws IOException {
         try (FileOutputStream fos = new FileOutputStream(file);
              BufferedOutputStream bos = new BufferedOutputStream(fos, 16 * 1024)) {
-            writeSobrantes(bos, data);
+            writeSobrantes(bos, data, coordenadas);
         }
         if (!file.isFile() || file.length() == 0L) {
             throw new IOException("Archivo de reporte vacío o no creado");
         }
     }
 
-    public static void writeSobrantes(OutputStream out, List<String> data) throws IOException {
-        String[] headers = {"RFID"};
+    public static void writeSobrantes(OutputStream out, List<SobranteRow> data, String coordenadas)
+            throws IOException {
+        String[] headers = {"RFID", "Motivo", "Ubicacion_en_maestro", "Coordenadas"};
         List<String[]> rows = new ArrayList<>();
+        String c = safeCoord(coordenadas);
         if (data != null) {
-            for (String rfid : data) {
-                rows.add(new String[]{safe(rfid)});
+            for (SobranteRow r : data) {
+                if (r == null) {
+                    continue;
+                }
+                String motivoTxt = SobranteRow.MOTIVO_NO_EN_MAESTRO.equals(r.motivo)
+                        ? "No en maestro"
+                        : "Otra ubicacion";
+                String ubi = r.ubicacionEnMaestro != null ? r.ubicacionEnMaestro : "";
+                rows.add(new String[]{safe(r.rfid), motivoTxt, safe(ubi), c});
             }
         }
         writeHtmlSpreadsheet(out, "Sobrantes", headers, rows);
     }
 
-    public static void writeFaltantes(File file, List<MasterRecord> data) throws IOException {
+    public static void writeFaltantes(File file, List<MasterRecord> data, String coordenadas) throws IOException {
         try (FileOutputStream fos = new FileOutputStream(file);
              BufferedOutputStream bos = new BufferedOutputStream(fos, 16 * 1024)) {
-            writeFaltantes(bos, data);
+            writeFaltantes(bos, data, coordenadas);
         }
         if (!file.isFile() || file.length() == 0L) {
             throw new IOException("Archivo de reporte vacío o no creado");
         }
     }
 
-    public static void writeFaltantes(OutputStream out, List<MasterRecord> data) throws IOException {
-        String[] headers = {"RFID", "Ubicacion", "Responsable", "Sede"};
+    public static void writeFaltantes(OutputStream out, List<MasterRecord> data, String coordenadas)
+            throws IOException {
+        String[] headers = {"RFID", "Ubicacion", "Responsable", "Sede", "Coordenadas"};
         List<String[]> rows = new ArrayList<>();
+        String c = safeCoord(coordenadas);
         if (data != null) {
             for (MasterRecord rec : data) {
                 if (rec == null) {
@@ -89,27 +103,30 @@ public final class ConciliationReportWriter {
                         safe(rec.rfid),
                         safe(rec.ubicacion),
                         safe(rec.responsable),
-                        safe(rec.sede)
+                        safe(rec.sede),
+                        c
                 });
             }
         }
         writeHtmlSpreadsheet(out, "Faltantes", headers, rows);
     }
 
-    public static void writeMissingSearchReport(File file, List<MissingSearchResultRow> data) throws IOException {
+    public static void writeMissingSearchReport(File file, List<MissingSearchResultRow> data, String coordenadas)
+            throws IOException {
         try (FileOutputStream fos = new FileOutputStream(file);
              BufferedOutputStream bos = new BufferedOutputStream(fos, 16 * 1024)) {
-            writeMissingSearchReport(bos, data);
+            writeMissingSearchReport(bos, data, coordenadas);
         }
         if (!file.isFile() || file.length() == 0L) {
             throw new IOException("Archivo de reporte vacío o no creado");
         }
     }
 
-    public static void writeMissingSearchReport(OutputStream out, List<MissingSearchResultRow> data)
-            throws IOException {
-        String[] headers = {"RFID", "Encontrado", "Sede"};
+    public static void writeMissingSearchReport(OutputStream out, List<MissingSearchResultRow> data,
+            String coordenadas) throws IOException {
+        String[] headers = {"RFID", "Encontrado", "Sede", "Coordenadas"};
         List<String[]> rows = new ArrayList<>();
+        String c = safeCoord(coordenadas);
         if (data != null) {
             for (MissingSearchResultRow rowData : data) {
                 if (rowData == null) {
@@ -118,11 +135,19 @@ public final class ConciliationReportWriter {
                 rows.add(new String[]{
                         safe(rowData.rfid),
                         rowData.encontrado ? "Sí" : "No",
-                        safe(rowData.sede)
+                        safe(rowData.sede),
+                        c
                 });
             }
         }
         writeHtmlSpreadsheet(out, "Faltantes", headers, rows);
+    }
+
+    private static String safeCoord(String coordenadas) {
+        if (coordenadas == null || coordenadas.trim().isEmpty()) {
+            return "sin ubicacion";
+        }
+        return coordenadas.trim();
     }
 
     private static void writeHtmlSpreadsheet(OutputStream rawOut, String sheetTitle, String[] headers,

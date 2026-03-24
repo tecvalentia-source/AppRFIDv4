@@ -2,13 +2,16 @@
 <resources>
     <string name="app_name">Confa App RFID</string>
 
+    <string name="scan_name_label">Nombre del escaneo</string>
+    <string name="scan_name_hint">Ej: PrimerEscaneo, InventarioMarzo</string>
+    <string name="need_scan_name">Escriba el nombre del escaneo</string>
     <string name="sede_label">Sede de inventario</string>
     <string name="mode_label">Modo</string>
     <string name="mode_reconcile">Conciliación inventario</string>
     <string name="mode_missing_search">Búsqueda de faltantes</string>
 
     <string name="btn_import_master">Importar maestro (CSV, TXT, XLSX, Excel XML)</string>
-    <string name="btn_import_missing">Importar lista faltantes</string>
+    <string name="btn_import_missing">Importar lista faltantes (CSV, TXT, XLSX, .xls exportado)</string>
     <string name="btn_new_session">Nueva sesión</string>
     <string name="new_session_cleared">Nueva sesión: se borraron importaciones, lista y escaneos.</string>
     <string name="btn_start_scan">Iniciar escaneo</string>
@@ -33,7 +36,8 @@
     <string name="import_running">Importando…</string>
     <string name="overlay_processing_db">Procesando base de datos…</string>
     <string name="import_ok">Se cargaron %1$d registros correctamente (duplicados omitidos: %2$d)</string>
-    <string name="import_format_error">El archivo no tiene el formato esperado (CSV, TXT o Excel XML).</string>
+    <string name="import_ok_filtered_empty">Se importaron %1$d registros; ninguno coincide con la sede «%2$s». Revise la columna Ubicación o elija otra sede.</string>
+    <string name="import_format_error">El archivo no tiene el formato esperado (CSV, TXT, XLSX/XML o .xls de exportación).</string>
     <string name="import_permission_denied">No se pudo leer el archivo. Elija el documento de nuevo o compruebe los permisos.</string>
     <string name="import_io_error">Error al leer el archivo.</string>
     <string name="import_missing_ok">Lista faltantes: %1$d RFID</string>
@@ -49,6 +53,17 @@
     <string name="export_chooser_three_files">Compartir 3 reportes (.xls)</string>
     <string name="export_subject_conciliation">Conciliación RFID</string>
     <string name="export_subject_missing">Búsqueda faltantes RFID</string>
+
+    <string name="epc_change_section">Cambio de EPC (UHF)</string>
+    <string name="epc_current_hint">EPC actual (hex)</string>
+    <string name="epc_new_hint">EPC nuevo (hex, longitud par de nibbles)</string>
+    <string name="epc_pwd_hint">Acceso (hex, ej. 00000000)</string>
+    <string name="epc_use_last_read">Última lectura</string>
+    <string name="epc_no_last_read">Aún no hay lectura en esta sesión</string>
+    <string name="epc_write_btn">Escribir EPC</string>
+    <string name="epc_stop_scan_first">Detenga el escaneo antes de escribir EPC</string>
+    <string name="epc_write_ok">EPC escrito correctamente</string>
+    <string name="epc_write_fail">No se pudo escribir: %1$s</string>
 
     <string-array name="sedes_inventario">
         <item>Versalles</item>
