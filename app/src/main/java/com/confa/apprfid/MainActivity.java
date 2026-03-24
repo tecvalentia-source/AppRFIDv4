@@ -1,6 +1,7 @@
 package com.confa.apprfid;
 
 import android.content.ClipData;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -62,9 +63,9 @@ public class MainActivity extends AppCompatActivity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private final ActivityResultLauncher<String[]> pickMasterLauncher =
-            registerForActivityResult(new ActivityResultContracts.OpenDocument(), this::onMasterDocumentPicked);
+            registerForActivityResult(new OpenDocumentPersistable(), this::onMasterDocumentPicked);
     private final ActivityResultLauncher<String[]> pickMissingLauncher =
-            registerForActivityResult(new ActivityResultContracts.OpenDocument(), this::onMissingDocumentPicked);
+            registerForActivityResult(new OpenDocumentPersistable(), this::onMissingDocumentPicked);
 
     private RFIDWithUHFUART mReader;
     private boolean inventoryRunning;
@@ -84,13 +85,17 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvCounterUnique;
     private TextView tvCounterTotal;
     private TextView tvMissingFound;
+    private View overlayLoading;
 
     private final MasterRecordsAdapter masterAdapter = new MasterRecordsAdapter();
 
     private AppMode appMode = AppMode.RECONCILE;
 
-    private List<MasterRecord> masterList = new ArrayList<>();
-    private Map<String, MasterRecord> masterByRfid = new HashMap<>();
+    /** Todos los registros importados del maestro. */
+    private List<MasterRecord> masterRecordsAll = new ArrayList<>();
+    private Map<String, MasterRecord> masterByRfidAll = new HashMap<>();
+    /** Subconjunto filtrado por la sede del spinner (misma clave normalizada que el escaneo). */
+    private final Map<String, MasterRecord> masterByRfidFiltered = new HashMap<>();
 
     private List<String> missingOrderRaw = new ArrayList<>();
     private final Set<String> missingTargetKeys = new HashSet<>();
@@ -156,6 +161,7 @@ public class MainActivity extends AppCompatActivity {
         tvCounterUnique = findViewById(R.id.tvCounterUnique);
         tvCounterTotal = findViewById(R.id.tvCounterTotal);
         tvMissingFound = findViewById(R.id.tvMissingFound);
+        overlayLoading = findViewById(R.id.overlayLoading);
 
         ArrayAdapter<CharSequence> sedeAdapter = ArrayAdapter.createFromResource(
                 this, R.array.sedes_inventario, android.R.layout.simple_spinner_dropdown_item);
@@ -163,6 +169,7 @@ public class MainActivity extends AppCompatActivity {
         spinnerSede.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                rebuildFilteredMasterForSelectedSede();
                 refreshActionStates();
             }
 
@@ -233,22 +240,25 @@ public class MainActivity extends AppCompatActivity {
 
     private void onMasterDocumentPicked(Uri uri) {
         if (uri == null) return;
-        Toast.makeText(this, R.string.import_running, Toast.LENGTH_SHORT).show();
+        maybeTakePersistableReadPermission(uri);
+        setLoadingOverlayVisible(true);
         MasterImportLoader.loadMasterAsync(getApplicationContext(), uri, ioExecutor, mainHandler,
                 new MasterImportLoader.MasterCallback() {
                     @Override
                     public void onSuccess(@NonNull MasterTableParser.ParseResult result) {
-                        masterList = new ArrayList<>(result.records);
-                        masterByRfid = new HashMap<>(result.byNormalizedRfid);
-                        masterAdapter.setItems(masterList);
+                        setLoadingOverlayVisible(false);
+                        masterRecordsAll = new ArrayList<>(result.records);
+                        masterByRfidAll = new HashMap<>(result.byNormalizedRfid);
+                        rebuildFilteredMasterForSelectedSede();
                         Toast.makeText(MainActivity.this,
-                                getString(R.string.import_ok, masterList.size(), result.duplicateCount),
+                                getString(R.string.import_ok, masterRecordsAll.size(), result.duplicateCount),
                                 Toast.LENGTH_LONG).show();
                         refreshActionStates();
                     }
 
                     @Override
                     public void onFailure(@NonNull String message) {
+                        setLoadingOverlayVisible(false);
                         Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
                     }
                 });
@@ -256,11 +266,13 @@ public class MainActivity extends AppCompatActivity {
 
     private void onMissingDocumentPicked(Uri uri) {
         if (uri == null) return;
-        Toast.makeText(this, R.string.import_running, Toast.LENGTH_SHORT).show();
+        maybeTakePersistableReadPermission(uri);
+        setLoadingOverlayVisible(true);
         MasterImportLoader.loadMissingListAsync(getApplicationContext(), uri, ioExecutor, mainHandler,
                 new MasterImportLoader.MissingListCallback() {
                     @Override
                     public void onSuccess(@NonNull List<String> orderedRfidsRaw) {
+                        setLoadingOverlayVisible(false);
                         missingOrderRaw = new ArrayList<>(orderedRfidsRaw);
                         missingTargetKeys.clear();
                         for (String raw : missingOrderRaw) {
@@ -277,9 +289,48 @@ public class MainActivity extends AppCompatActivity {
 
                     @Override
                     public void onFailure(@NonNull String message) {
+                        setLoadingOverlayVisible(false);
                         Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
                     }
                 });
+    }
+
+    private void setLoadingOverlayVisible(boolean visible) {
+        if (overlayLoading != null) {
+            overlayLoading.setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    private void maybeTakePersistableReadPermission(Uri uri) {
+        try {
+            getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } catch (SecurityException e) {
+            Log.w(TAG, "takePersistableUriPermission", e);
+        }
+    }
+
+    /**
+     * Actualiza el mapa filtrado por sede y el RecyclerView.
+     */
+    private void rebuildFilteredMasterForSelectedSede() {
+        masterByRfidFiltered.clear();
+        String sede = getSelectedSede();
+        List<MasterRecord> forList = new ArrayList<>();
+        if (masterRecordsAll.isEmpty()) {
+            masterAdapter.setItems(forList);
+            return;
+        }
+        for (MasterRecord r : masterRecordsAll) {
+            if (SedeMatcher.matches(r, sede)) {
+                forList.add(r);
+            }
+        }
+        for (Map.Entry<String, MasterRecord> e : masterByRfidAll.entrySet()) {
+            if (SedeMatcher.matches(e.getValue(), sede)) {
+                masterByRfidFiltered.put(e.getKey(), e.getValue());
+            }
+        }
+        masterAdapter.setItems(forList);
     }
 
     @NonNull
@@ -294,7 +345,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         newSession();
-        Toast.makeText(this, "Nueva sesión: listas de escaneo reiniciadas.", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, R.string.new_session_cleared, Toast.LENGTH_SHORT).show();
     }
 
     private void newSession() {
@@ -306,10 +357,18 @@ public class MainActivity extends AppCompatActivity {
         scanSessionStarted = false;
         lastReconciliation = null;
         lastMissingReport = null;
+
+        masterRecordsAll = new ArrayList<>();
+        masterByRfidAll = new HashMap<>();
+        masterByRfidFiltered.clear();
+        missingOrderRaw = new ArrayList<>();
+        missingTargetKeys.clear();
+        masterAdapter.setItems(new ArrayList<>());
+
         tvCounterUnique.setText(getString(R.string.counter_unique, 0));
         tvCounterTotal.setText(getString(R.string.counter_total, 0));
         if (appMode == AppMode.MISSING_SEARCH) {
-            tvMissingFound.setText(getString(R.string.counter_missing_found, 0, missingTargetKeys.size()));
+            tvMissingFound.setText(getString(R.string.counter_missing_found, 0, 0));
         }
         updateScanStatusIdle();
         refreshActionStates();
@@ -324,8 +383,12 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         if (appMode == AppMode.RECONCILE) {
-            if (masterByRfid.isEmpty()) {
+            if (masterByRfidAll.isEmpty()) {
                 Toast.makeText(this, R.string.need_master, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (masterByRfidFiltered.isEmpty()) {
+                Toast.makeText(this, R.string.need_master_sede, Toast.LENGTH_SHORT).show();
                 return;
             }
         } else {
@@ -419,12 +482,12 @@ public class MainActivity extends AppCompatActivity {
         btnFinalize.setEnabled(false);
 
         if (appMode == AppMode.RECONCILE) {
+            final Map<String, MasterRecord> masterSnapshot = new HashMap<>(masterByRfidFiltered);
             ioExecutor.execute(() -> {
                 Set<String> scanCopy = new HashSet<>(scannedNormalized);
                 Map<String, String> rawCopy = new HashMap<>(scannedRawByNorm);
-                Map<String, MasterRecord> masterCopy = new HashMap<>(masterByRfid);
                 ReconciliationEngine.Result result =
-                        ReconciliationEngine.compute(masterCopy, scanCopy, rawCopy, sede);
+                        ReconciliationEngine.compute(masterSnapshot, scanCopy, rawCopy, sede);
                 mainHandler.post(() -> {
                     lastReconciliation = result;
                     sessionFinalized = true;
@@ -530,8 +593,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void refreshActionStates() {
+        boolean masterReady = !masterByRfidAll.isEmpty() && !masterByRfidFiltered.isEmpty();
         boolean prereq = !getSelectedSede().isEmpty()
-                && (appMode == AppMode.RECONCILE ? !masterByRfid.isEmpty() : !missingTargetKeys.isEmpty());
+                && (appMode == AppMode.RECONCILE ? masterReady : !missingTargetKeys.isEmpty());
         boolean canStart = !inventoryRunning && !sessionFinalized && prereq && !scanSessionStarted;
 
         btnStartScan.setEnabled(canStart);
@@ -540,7 +604,7 @@ public class MainActivity extends AppCompatActivity {
         boolean canFinalize = !sessionFinalized
                 && !getSelectedSede().isEmpty()
                 && (appMode == AppMode.RECONCILE
-                ? !masterByRfid.isEmpty()
+                ? masterReady
                 : !missingTargetKeys.isEmpty());
         btnFinalize.setEnabled(canFinalize);
 
@@ -576,5 +640,17 @@ public class MainActivity extends AppCompatActivity {
             Thread.currentThread().interrupt();
         }
         super.onDestroy();
+    }
+
+    /** OpenDocument con permiso persistente de lectura cuando el proveedor lo permite (Android 11+). */
+    private static final class OpenDocumentPersistable extends ActivityResultContracts.OpenDocument {
+        @NonNull
+        @Override
+        public Intent createIntent(@NonNull Context context, @NonNull String[] input) {
+            Intent intent = super.createIntent(context, input);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+            return intent;
+        }
     }
 }

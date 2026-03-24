@@ -7,9 +7,10 @@
     <string name="mode_reconcile">Conciliación inventario</string>
     <string name="mode_missing_search">Búsqueda de faltantes</string>
 
-    <string name="btn_import_master">Importar maestro (CSV / Excel XML)</string>
+    <string name="btn_import_master">Importar maestro (CSV, TXT, XLSX, Excel XML)</string>
     <string name="btn_import_missing">Importar lista faltantes</string>
     <string name="btn_new_session">Nueva sesión</string>
+    <string name="new_session_cleared">Nueva sesión: se borraron importaciones, lista y escaneos.</string>
     <string name="btn_start_scan">Iniciar escaneo</string>
     <string name="btn_pause">Pausar</string>
     <string name="btn_resume">Continuar</string>
@@ -30,10 +31,15 @@
     <string name="col_responsable">Resp.</string>
 
     <string name="import_running">Importando…</string>
-    <string name="import_ok">Cargados %1$d registros (duplicados omitidos: %2$d)</string>
+    <string name="overlay_processing_db">Procesando base de datos…</string>
+    <string name="import_ok">Se cargaron %1$d registros correctamente (duplicados omitidos: %2$d)</string>
+    <string name="import_format_error">El archivo no tiene el formato esperado (CSV, TXT o Excel XML).</string>
+    <string name="import_permission_denied">No se pudo leer el archivo. Elija el documento de nuevo o compruebe los permisos.</string>
+    <string name="import_io_error">Error al leer el archivo.</string>
     <string name="import_missing_ok">Lista faltantes: %1$d RFID</string>
     <string name="finalize_processing">Procesando conciliación…</string>
     <string name="need_master">Importe el archivo maestro</string>
+    <string name="need_master_sede">No hay registros del maestro para la sede seleccionada</string>
     <string name="need_missing_list">Importe el archivo de faltantes</string>
     <string name="need_sede">Seleccione la sede</string>
     <string name="export_nothing">No hay reporte para exportar</string>

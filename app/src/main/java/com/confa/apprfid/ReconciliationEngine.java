@@ -16,9 +16,13 @@ public class ReconciliationEngine {
     public static Result compute(Map<String, MasterRecord> masterMap, Set<String> scannedNorm, Map<String, String> rawMap, String sede) {
         Result result = new Result();
 
-        // 1. Encontrar Exitosos y Faltantes
+        // 1. Encontrar Exitosos y Faltantes (RFID del maestro normalizado como en el escaneo)
         for (MasterRecord record : masterMap.values()) {
-            if (scannedNorm.contains(record.rfid)) {
+            String norm = RfidNormalizer.normalize(record.rfid);
+            if (norm.isEmpty()) {
+                continue;
+            }
+            if (scannedNorm.contains(norm)) {
                 result.exitosos.add(record);
             } else {
                 result.faltantes.add(record);
