@@ -124,11 +124,16 @@ public final class ConciliationReportWriter {
             String coordenadas) throws IOException {
         String[] headers = {"RFID", "Encontrado", "Sede", "Coordenadas"};
         List<String[]> rows = new ArrayList<>();
-        String c = safeCoord(coordenadas);
+        String c = "";
         if (data != null) {
             for (MissingSearchResultRow rowData : data) {
+
+
                 if (rowData == null) {
                     continue;
+                }
+                if (rowData.encontrado){
+                    c = safeCoord(coordenadas);
                 }
                 rows.add(new String[]{
                         safe(rowData.rfid),
