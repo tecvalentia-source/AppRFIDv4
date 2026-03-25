@@ -2,8 +2,6 @@ package com.confa.apprfid;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.widget.Toast;
-
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -26,12 +24,15 @@ public class MenuPrincipalActivity extends AppCompatActivity {
                 startActivity(new Intent(this, MainActivity.class)));
 
         binding.cardScanIndividual.setOnClickListener(v ->
-                Toast.makeText(this, R.string.menu_soon, Toast.LENGTH_SHORT).show());
+                startActivity(new Intent(this, SingleScanActivity.class)));
 
         binding.cardFilterIndividual.setOnClickListener(v ->
-                Toast.makeText(this, R.string.menu_soon, Toast.LENGTH_SHORT).show());
+                startActivity(new Intent(this, FilterScanActivity.class)));
 
         binding.cardBulkRead.setOnClickListener(v ->
-                Toast.makeText(this, R.string.menu_soon, Toast.LENGTH_SHORT).show());
+                startActivity(new Intent(this, MassReadActivity.class)));
+
+        binding.cardSettings.setOnClickListener(v ->
+                startActivity(new Intent(this, SettingsActivity.class)));
     }
 }

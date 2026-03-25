@@ -1,5 +1,7 @@
 package com.confa.apprfid;
 
+import androidx.annotation.NonNull;
+
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -144,6 +146,26 @@ public final class ConciliationReportWriter {
             }
         }
         writeXlsxSpreadsheet(out, "Faltantes", headers, rows);
+    }
+
+    /**
+     * Lectura masiva: RFID, ubicación/sede, coordenadas (misma fila para todas las lecturas).
+     */
+    public static void writeMassInventoryRead(@NonNull OutputStream out,
+            @NonNull List<String> rfidOrdered,
+            @NonNull String ubicacion,
+            @NonNull String coordenadas) throws IOException {
+        String[] headers = {"RFID", "Ubicacion", "Coordenadas"};
+        List<String[]> rows = new ArrayList<>();
+        String c = safeCoord(coordenadas);
+        String u = safe(ubicacion);
+        for (String epc : rfidOrdered) {
+            if (epc == null || epc.trim().isEmpty()) {
+                continue;
+            }
+            rows.add(new String[]{safe(epc), u, c});
+        }
+        writeXlsxSpreadsheet(out, "LecturaMasiva", headers, rows);
     }
 
     private static String safeCoord(String coordenadas) {

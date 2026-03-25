@@ -54,4 +54,15 @@ public final class ExportFileNamer {
         return String.format(Locale.US, "%s_%s_%s_%s.xls",
                 sedePrefix, sanitizedScanName, dateYyyyMmDd, typeSuffix);
     }
+
+    /**
+     * Lectura masiva: {@code PrefijoSede_NombreArchivo_Fecha.xls} (mismo criterio que escaneo principal).
+     */
+    @NonNull
+    public static String buildMassReadFileName(@NonNull String sedePrefix,
+            @NonNull String sanitizedFileBaseName,
+            @NonNull String dateYyyyMmDd) {
+        return String.format(Locale.US, "%s_%s_%s.xls",
+                sedePrefix, sanitizedFileBaseName, dateYyyyMmDd);
+    }
 }

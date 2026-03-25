@@ -253,7 +253,9 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             mReader = RFIDWithUHFUART.getInstance();
-            if (mReader != null && !mReader.init(this)) {
+            if (mReader != null && mReader.init(this)) {
+                ReaderPrefs.applyToReader(this, mReader);
+            } else if (mReader != null) {
                 showAlert(getString(R.string.rfid_init_failed));
                 Log.e(TAG, "RFID init failed");
             }

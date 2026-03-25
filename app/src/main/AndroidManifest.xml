@@ -24,6 +24,26 @@
             android:exported="false"
             android:theme="@style/Theme.AppRFID.MainScan"
             android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".SingleScanActivity"
+            android:exported="false"
+            android:parentActivityName=".MenuPrincipalActivity"
+            android:theme="@style/Theme.AppRFID.Module" />
+        <activity
+            android:name=".FilterScanActivity"
+            android:exported="false"
+            android:parentActivityName=".MenuPrincipalActivity"
+            android:theme="@style/Theme.AppRFID.Module" />
+        <activity
+            android:name=".MassReadActivity"
+            android:exported="false"
+            android:parentActivityName=".MenuPrincipalActivity"
+            android:theme="@style/Theme.AppRFID.Module" />
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:parentActivityName=".MenuPrincipalActivity"
+            android:theme="@style/Theme.AppRFID.Module" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
