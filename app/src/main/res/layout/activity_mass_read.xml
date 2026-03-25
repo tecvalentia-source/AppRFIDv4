@@ -1,108 +1,209 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/menu_background_blue"
-    android:fillViewport="true">
+    android:orientation="vertical"
+    android:padding="20dp">
 
-    <LinearLayout
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="20dp">
+        android:fillViewport="false">
 
-        <TextView
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/mass_read_title"
-            android:textColor="@color/menu_text_on_colored"
-            android:textSize="22sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/mass_read_file_label"
-            android:textColor="@color/menu_text_on_colored"
-            android:textStyle="bold" />
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            app:cardBackgroundColor="@color/menu_card_white"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="4dp">
-
-            <EditText
-                android:id="@+id/etMassFileName"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@android:color/transparent"
-                android:hint="@string/mass_read_file_hint"
-                android:inputType="text"
-                android:padding="14dp"
-                android:textColor="@color/black" />
-        </com.google.android.material.card.MaterialCardView>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/sede_label"
-            android:textColor="@color/menu_text_on_colored"
-            android:textStyle="bold" />
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            app:cardBackgroundColor="@color/menu_card_white"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="4dp">
-
-            <Spinner
-                android:id="@+id/spinnerMassSede"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="48dp"
-                android:padding="4dp"
-                android:popupTheme="@style/ThemeOverlay.AppCompat.Light" />
-        </com.google.android.material.card.MaterialCardView>
-
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardMassToggleScan"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            app:cardBackgroundColor="@color/menu_card_white"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="6dp"
-            app:rippleColor="#3300AEEF">
+            android:orientation="vertical">
 
             <TextView
-                android:id="@+id/tvMassToggle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center"
-                android:minHeight="56dp"
-                android:text="@string/mass_read_start"
-                android:textColor="@color/menu_text_on_white"
-                android:textSize="16sp"
+                android:text="@string/mass_read_title"
+                android:textColor="@color/menu_text_on_colored"
+                android:textSize="22sp"
                 android:textStyle="bold" />
-        </com.google.android.material.card.MaterialCardView>
 
-        <TextView
-            android:id="@+id/tvMassCount"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:textColor="@color/menu_text_on_colored"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-</androidx.core.widget.NestedScrollView>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/mass_read_file_label"
+                android:textColor="@color/menu_text_on_colored"
+                android:textStyle="bold" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                app:cardBackgroundColor="@color/menu_card_white"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="4dp">
+
+                <EditText
+                    android:id="@+id/etMassFileName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@android:color/transparent"
+                    android:hint="@string/mass_read_file_hint"
+                    android:inputType="text"
+                    android:padding="14dp"
+                    android:textColor="@color/black" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/sede_label"
+                android:textColor="@color/menu_text_on_colored"
+                android:textStyle="bold" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                app:cardBackgroundColor="@color/menu_card_white"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="4dp">
+
+                <Spinner
+                    android:id="@+id/spinnerMassSede"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:padding="4dp"
+                    android:popupTheme="@style/ThemeOverlay.AppCompat.Light" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardMassStartContinue"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardBackgroundColor="@color/menu_card_lime"
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="6dp"
+                    app:rippleColor="#33FFFFFF">
+
+                    <TextView
+                        android:id="@+id/tvMassStartContinue"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:minHeight="52dp"
+                        android:text="@string/mass_read_start"
+                        android:textColor="@color/menu_text_on_colored"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardMassPause"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:visibility="gone"
+                    app:cardBackgroundColor="@color/menu_card_orange"
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="6dp"
+                    app:rippleColor="#33FFFFFF">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:minHeight="52dp"
+                        android:text="@string/mass_read_pause"
+                        android:textColor="@color/menu_text_on_colored"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardMassExport"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:clickable="true"
+                android:focusable="true"
+                app:cardBackgroundColor="@color/menu_card_white"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="6dp"
+                app:rippleColor="#3300AEEF">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:minHeight="52dp"
+                    android:text="@string/mass_read_export"
+                    android:textColor="@color/menu_text_on_white"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardMassClear"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:clickable="true"
+                android:focusable="true"
+                app:cardBackgroundColor="@color/menu_card_orange"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="4dp"
+                app:rippleColor="#33FFFFFF">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:minHeight="48dp"
+                    android:text="@string/mass_read_clear"
+                    android:textColor="@color/menu_text_on_colored"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                android:id="@+id/tvMassCount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:textColor="@color/menu_text_on_colored"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/mass_read_live_hint"
+        android:textColor="@color/menu_text_on_colored"
+        android:textSize="13sp" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvMassLive"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="6dp"
+        android:layout_weight="1"
+        android:clipToPadding="false" />
+</LinearLayout>

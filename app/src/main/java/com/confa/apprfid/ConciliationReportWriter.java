@@ -168,6 +168,26 @@ public final class ConciliationReportWriter {
         writeXlsxSpreadsheet(out, "LecturaMasiva", headers, rows);
     }
 
+    /**
+     * Exportación modo filtro agrupado: RFID, RSSI (dBm) y número de lecturas.
+     */
+    public static void writeFilterGroupedExport(@NonNull OutputStream out,
+            @NonNull List<FilterTagRow> rows) throws IOException {
+        String[] headers = {"RFID", "RSSI_dBm", "Lecturas"};
+        List<String[]> data = new ArrayList<>();
+        for (FilterTagRow r : rows) {
+            if (r == null) {
+                continue;
+            }
+            data.add(new String[]{
+                    safe(r.epc),
+                    String.valueOf(r.rssiDbm),
+                    String.valueOf(r.readCount)
+            });
+        }
+        writeXlsxSpreadsheet(out, "FiltroAgrupado", headers, data);
+    }
+
     private static String safeCoord(String coordenadas) {
         if (coordenadas == null || coordenadas.trim().isEmpty()) {
             return "sin ubicacion";

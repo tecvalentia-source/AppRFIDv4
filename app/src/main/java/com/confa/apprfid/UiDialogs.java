@@ -33,4 +33,16 @@ public final class UiDialogs {
     public static void showOk(@NonNull Context context, @StringRes int messageRes) {
         showOk(context, context.getString(messageRes));
     }
+
+    public static void showConfirm(@NonNull Context context, @NonNull CharSequence message,
+            @NonNull Runnable onConfirm) {
+        new MaterialAlertDialogBuilder(context, R.style.ThemeOverlay_AppRFID_MaterialAlertDialog)
+                .setMessage(message)
+                .setNegativeButton(R.string.dialog_cancel, (d, w) -> d.dismiss())
+                .setPositiveButton(R.string.dialog_ok, (d, w) -> {
+                    d.dismiss();
+                    onConfirm.run();
+                })
+                .show();
+    }
 }

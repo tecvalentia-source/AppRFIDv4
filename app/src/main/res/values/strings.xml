@@ -5,7 +5,7 @@
     <string name="menu_title_rfid_confa">RFID Confa</string>
     <string name="menu_scan_assets">Escaneo (Busqueda de activos)</string>
     <string name="menu_scan_individual">Escaneo individual</string>
-    <string name="menu_filter_individual">Filtro individual</string>
+    <string name="menu_filter_individual">Filtro </string>
     <string name="menu_bulk_read">Lectura masiva</string>
     <string name="menu_settings">Configuración lectora</string>
     <string name="menu_logo_content_description">Logo Confa</string>
@@ -18,6 +18,9 @@
     <string name="single_scan_proximity">Proximidad</string>
     <string name="single_scan_proximity_value">%1$s (%2$d%%)</string>
     <string name="single_scan_placeholder">Pulse Escanear</string>
+    <string name="single_scan_clear">Limpiar</string>
+    <string name="single_scan_clear_confirm">¿Vaciar la lista y el contador de lecturas?</string>
+    <string name="single_scan_counter">Lecturas registradas: %1$d</string>
     <string name="single_scan_no_tag">No se detectó ninguna etiqueta.</string>
     <string name="single_scan_error">Error en lectura: %1$s</string>
 
@@ -29,13 +32,33 @@
     <string name="filter_start_scan">Iniciar escaneo</string>
     <string name="filter_stop_scan">Detener</string>
     <string name="filter_need_digits">Ingrese al menos un carácter para filtrar.</string>
+    <string name="filter_rssi_numeric">RSSI (dBm): %1$d</string>
+    <string name="filter_beep_section">Pitido de búsqueda</string>
+    <string name="filter_beep_enable">Activar pitido</string>
+    <string name="filter_beep_volume_value">Volumen del pitido: %1$d%%</string>
+    <string name="filter_grouped_stats">Etiquetas únicas: %1$d · Lecturas totales: %2$d</string>
+    <string name="filter_row_rssi">RSSI: %1$s</string>
+    <string name="filter_row_reads">Veces leída: %1$d</string>
+    <string name="filter_export_grouped">Exportar resultados</string>
+    <string name="filter_export_confirm">¿Exportar la lista agrupada a un archivo en Descargas?</string>
+    <string name="filter_export_empty">No hay etiquetas para exportar.</string>
+    <string name="filter_export_ok">Archivo guardado en Descargas/%1$s\n\n%2$s</string>
+    <string name="filter_export_subject">Filtro agrupado RFID</string>
+    <string name="filter_export_chooser">Compartir archivo</string>
 
     <string name="mass_read_title">Lectura masiva</string>
     <string name="mass_read_file_label">Nombre de archivo</string>
     <string name="mass_read_file_hint">Ej: InventarioBodega</string>
     <string name="mass_read_start">Escanear</string>
-    <string name="mass_read_stop">Detener y exportar</string>
-    <string name="mass_read_count">Etiquetas únicas: %1$d</string>
+    <string name="mass_read_pause">Pausar</string>
+    <string name="mass_read_resume">Continuar</string>
+    <string name="mass_read_export">Exportar</string>
+    <string name="mass_read_clear">Limpiar</string>
+    <string name="mass_read_clear_confirm">¿Detener la lectura (si está activa) y borrar todos los datos de la pantalla?</string>
+    <string name="mass_read_export_confirm">¿Generar el archivo y guardarlo en Descargas con las coordenadas actuales?</string>
+    <string name="mass_read_export_subject">Lectura masiva RFID</string>
+    <string name="mass_read_live_hint">Lecturas en vivo (más reciente arriba)</string>
+    <string name="mass_read_count_detailed">Únicos: %1$d · Lecturas: %2$d</string>
     <string name="mass_read_empty_export">No hay etiquetas para exportar.</string>
     <string name="mass_read_need_filename">Escriba un nombre de archivo.</string>
     <string name="mass_read_export_ok">Archivo guardado en Descargas/%1$s\n\n%2$s</string>
@@ -45,11 +68,13 @@
     <string name="settings_title">Configuración lectora</string>
     <string name="settings_power_label">Potencia de transmisión (dBm)</string>
     <string name="settings_power_value">%1$d dBm</string>
-    <string name="settings_region_label">Región / modo de frecuencia</string>
+    <string name="settings_volume_label">Volumen de alertas (pitidos)</string>
+    <string name="settings_volume_value">%1$d%%</string>
     <string name="settings_save">Guardar</string>
     <string name="settings_saved">Configuración guardada. Se aplicará al usar la lectora.</string>
 
     <string name="dialog_ok">OK</string>
+    <string name="dialog_cancel">Cancelar</string>
     <string name="missing_row_found_yes">Sí</string>
     <string name="missing_row_found_no">No</string>
     <string name="col_estado">Estado</string>
@@ -124,21 +149,6 @@
     <string name="epc_stop_scan_first">Detenga el escaneo antes de escribir EPC</string>
     <string name="epc_write_ok">EPC escrito correctamente</string>
     <string name="epc_write_fail">No se pudo escribir: %1$s</string>
-
-    <string-array name="frequency_region_labels">
-        <item>Modo 0 (predeterminado dispositivo)</item>
-        <item>Modo 1</item>
-        <item>Modo 2</item>
-        <item>Modo 3</item>
-        <item>Modo 4</item>
-        <item>Modo 5</item>
-        <item>Modo 6</item>
-        <item>Modo 7</item>
-        <item>Modo 8</item>
-        <item>Modo 9</item>
-        <item>Modo 10</item>
-        <item>Modo 11</item>
-    </string-array>
 
     <string-array name="sedes_inventario">
         <item>Versalles</item>

@@ -35,7 +35,9 @@ public class FilterGroupedAdapter extends RecyclerView.Adapter<FilterGroupedAdap
     public void onBindViewHolder(@NonNull VH h, int position) {
         FilterTagRow r = items.get(position);
         h.tvEpc.setText(r.epc);
-        h.tvRssi.setText(r.rssiRaw.isEmpty() ? "—" : r.rssiRaw + " dBm");
+        h.tvRssi.setText(h.itemView.getContext().getString(R.string.filter_row_rssi,
+                RssiUiUtils.formatDbmDisplay(r.rssiRaw)));
+        h.tvReads.setText(h.itemView.getContext().getString(R.string.filter_row_reads, r.readCount));
         int pct = RssiUiUtils.proximityPercent(r.rssiDbm);
         h.progress.setProgress(pct);
     }
@@ -48,12 +50,14 @@ public class FilterGroupedAdapter extends RecyclerView.Adapter<FilterGroupedAdap
     static class VH extends RecyclerView.ViewHolder {
         final TextView tvEpc;
         final TextView tvRssi;
+        final TextView tvReads;
         final ProgressBar progress;
 
         VH(View v) {
             super(v);
             tvEpc = v.findViewById(R.id.tvFilterEpc);
             tvRssi = v.findViewById(R.id.tvFilterRssi);
+            tvReads = v.findViewById(R.id.tvFilterReads);
             progress = v.findViewById(R.id.progressFilterRow);
         }
     }

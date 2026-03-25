@@ -1,24 +1,25 @@
 package com.confa.apprfid;
 
 import android.os.Bundle;
-import android.view.View;
-import android.widget.ProgressBar;
-import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.card.MaterialCardView;
 import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.deviceapi.entity.InventoryParameter;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 
+import android.widget.TextView;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Inventario de una sola etiqueta con RSSI y barra de proximidad.
+ * Inventario de una sola etiqueta por pulsación; historial en lista con RSSI y proximidad.
  */
 public class SingleScanActivity extends AppCompatActivity {
 
@@ -26,10 +27,10 @@ public class SingleScanActivity extends AppCompatActivity {
     private final ExecutorService io = Executors.newSingleThreadExecutor();
 
     private MaterialCardView cardScan;
-    private TextView tvEpc;
-    private TextView tvRssi;
-    private TextView tvProximityLabel;
-    private ProgressBar progressProximity;
+    private MaterialCardView cardClear;
+    private TextView tvCounter;
+    private RecyclerView rvHistory;
+    private SingleScanAdapter adapter;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -41,14 +42,30 @@ public class SingleScanActivity extends AppCompatActivity {
         }
 
         cardScan = findViewById(R.id.cardScan);
-        tvEpc = findViewById(R.id.tvEpc);
-        tvRssi = findViewById(R.id.tvRssi);
-        tvProximityLabel = findViewById(R.id.tvProximityLabel);
-        progressProximity = findViewById(R.id.progressProximity);
+        cardClear = findViewById(R.id.cardClear);
+        tvCounter = findViewById(R.id.tvSingleCounter);
+        rvHistory = findViewById(R.id.rvSingleHistory);
+
+        adapter = new SingleScanAdapter();
+        rvHistory.setLayoutManager(new LinearLayoutManager(this));
+        rvHistory.setAdapter(adapter);
+        updateCounterLabel();
 
         initReader();
 
         cardScan.setOnClickListener(v -> runSingleInventory());
+        cardClear.setOnClickListener(v -> UiDialogs.showConfirm(this,
+                getString(R.string.single_scan_clear_confirm),
+                this::performClear));
+    }
+
+    private void performClear() {
+        adapter.clear();
+        updateCounterLabel();
+    }
+
+    private void updateCounterLabel() {
+        tvCounter.setText(getString(R.string.single_scan_counter, adapter.getTotalCount()));
     }
 
     @Override
@@ -95,22 +112,15 @@ public class SingleScanActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 cardScan.setEnabled(true);
                 if (tag == null || tag.getEPC() == null || tag.getEPC().isEmpty()) {
-                    tvEpc.setText(R.string.single_scan_no_tag);
-                    tvRssi.setText("—");
-                    progressProximity.setProgress(0);
-                    tvProximityLabel.setText(R.string.single_scan_proximity);
                     UiDialogs.showOk(this, getString(R.string.single_scan_no_tag));
                     return;
                 }
                 String epc = tag.getEPC().trim();
                 String rssiStr = tag.getRssi() != null ? tag.getRssi() : "";
-                tvEpc.setText(epc);
-                tvRssi.setText(rssiStr.isEmpty() ? "—" : rssiStr + " dBm");
                 int db = RssiUiUtils.parseRssiDbm(rssiStr);
-                int pct = RssiUiUtils.proximityPercent(db);
-                progressProximity.setProgress(pct);
-                tvProximityLabel.setText(getString(R.string.single_scan_proximity_value,
-                        RssiUiUtils.proximityLabel(pct), pct));
+                adapter.append(new SingleScanEntry(epc, rssiStr, db));
+                rvHistory.scrollToPosition(0);
+                updateCounterLabel();
             });
         });
     }

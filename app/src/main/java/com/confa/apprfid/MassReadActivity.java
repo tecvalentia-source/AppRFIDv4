@@ -3,8 +3,9 @@ package com.confa.apprfid;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.widget.ArrayAdapter;
+import android.view.View;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 
@@ -13,12 +14,16 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.card.MaterialCardView;
 import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.deviceapi.entity.InventoryParameter;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 import com.rscja.deviceapi.interfaces.IUHFInventoryCallback;
+
+import android.widget.ArrayAdapter;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -32,20 +37,27 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Inventario masivo y exportación .xls (RFID, Ubicación, Coordenadas).
+ * Inventario masivo con lista en vivo, pausa/reanudación y exportación con compartir.
  */
 public class MassReadActivity extends AppCompatActivity {
 
     private RFIDWithUHFUART reader;
-    private boolean scanning;
+    private boolean inventoryRunning;
+    private boolean pausedAfterRun;
     private final ArrayList<String> tagOrder = new ArrayList<>();
     private final Set<String> seenNorm = new HashSet<>();
+    private int totalReadEvents;
 
     private EditText etFileName;
     private Spinner spinnerSede;
-    private MaterialCardView cardToggle;
-    private TextView tvToggle;
+    private MaterialCardView cardStartContinue;
+    private MaterialCardView cardPause;
+    private TextView tvStartContinue;
+    private MaterialCardView cardExport;
+    private MaterialCardView cardClear;
     private TextView tvCount;
+    private RecyclerView rvLive;
+    private MassReadLiveAdapter liveAdapter;
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final ActivityResultLauncher<String[]> requestLocation =
@@ -68,7 +80,19 @@ public class MassReadActivity extends AppCompatActivity {
             if (epc == null || epc.trim().isEmpty()) {
                 return;
             }
-            runOnUiThread(() -> addTagIfNew(epc.trim()));
+            String trimmed = epc.trim();
+            String rssiStr = uhftagInfo.getRssi() != null ? uhftagInfo.getRssi() : "";
+            int db = RssiUiUtils.parseRssiDbm(rssiStr);
+            runOnUiThread(() -> {
+                totalReadEvents++;
+                liveAdapter.prepend(new MassLiveRow(trimmed, rssiStr, db));
+                rvLive.scrollToPosition(0);
+                String norm = RfidNormalizer.normalize(trimmed);
+                if (!norm.isEmpty() && seenNorm.add(norm)) {
+                    tagOrder.add(trimmed);
+                }
+                updateCountLabel();
+            });
         }
     };
 
@@ -83,90 +107,85 @@ public class MassReadActivity extends AppCompatActivity {
 
         etFileName = findViewById(R.id.etMassFileName);
         spinnerSede = findViewById(R.id.spinnerMassSede);
-        cardToggle = findViewById(R.id.cardMassToggleScan);
-        tvToggle = findViewById(R.id.tvMassToggle);
+        cardStartContinue = findViewById(R.id.cardMassStartContinue);
+        cardPause = findViewById(R.id.cardMassPause);
+        tvStartContinue = findViewById(R.id.tvMassStartContinue);
+        cardExport = findViewById(R.id.cardMassExport);
+        cardClear = findViewById(R.id.cardMassClear);
         tvCount = findViewById(R.id.tvMassCount);
+        rvLive = findViewById(R.id.rvMassLive);
+
+        liveAdapter = new MassReadLiveAdapter();
+        rvLive.setLayoutManager(new LinearLayoutManager(this));
+        rvLive.setAdapter(liveAdapter);
 
         ArrayAdapter<CharSequence> sedeAdapter = ArrayAdapter.createFromResource(this,
                 R.array.sedes_inventario, android.R.layout.simple_spinner_dropdown_item);
         spinnerSede.setAdapter(sedeAdapter);
 
-        cardToggle.setOnClickListener(v -> toggleScan());
+        cardStartContinue.setOnClickListener(v -> onStartOrContinue());
+        cardPause.setOnClickListener(v -> pauseScanning());
+        cardExport.setOnClickListener(v -> UiDialogs.showConfirm(this,
+                getString(R.string.mass_read_export_confirm),
+                this::beginExportFlow));
+        cardClear.setOnClickListener(v -> UiDialogs.showConfirm(this,
+                getString(R.string.mass_read_clear_confirm),
+                this::performClear));
+
         updateCountLabel();
+        refreshScanButtons();
         initReader();
     }
 
-    @Override
-    public boolean onSupportNavigateUp() {
-        finish();
-        return true;
-    }
-
-    private void initReader() {
-        try {
-            reader = RFIDWithUHFUART.getInstance();
-            if (reader == null || !reader.init(this)) {
-                UiDialogs.showOk(this, getString(R.string.rfid_init_failed));
-                cardToggle.setEnabled(false);
-                return;
-            }
-            ReaderPrefs.applyToReader(this, reader);
-        } catch (Exception e) {
-            UiDialogs.showOk(this, getString(R.string.rfid_config_error,
-                    e.getMessage() != null ? e.getMessage() : ""));
-            cardToggle.setEnabled(false);
-        }
-    }
-
-    private void addTagIfNew(String epc) {
-        String norm = RfidNormalizer.normalize(epc);
-        if (norm.isEmpty() || !seenNorm.add(norm)) {
+    private void onStartOrContinue() {
+        if (reader == null || inventoryRunning) {
             return;
         }
-        tagOrder.add(epc);
-        updateCountLabel();
-    }
-
-    private void updateCountLabel() {
-        tvCount.setText(getString(R.string.mass_read_count, tagOrder.size()));
-    }
-
-    private void toggleScan() {
-        if (scanning) {
-            stopScan();
-            onStoppedOfferExport();
-            return;
-        }
-        if (reader == null) {
-            return;
-        }
+        reader.setInventoryCallback(inventoryCb);
         InventoryParameter param = new InventoryParameter();
         param.setResultData(new InventoryParameter.ResultData().setNeedPhase(false));
-        reader.setInventoryCallback(inventoryCb);
         if (reader.startInventoryTag(param)) {
-            scanning = true;
-            tvToggle.setText(R.string.mass_read_stop);
-            cardToggle.setCardBackgroundColor(ContextCompat.getColor(this, R.color.menu_card_orange));
+            inventoryRunning = true;
+            pausedAfterRun = false;
+            refreshScanButtons();
         } else {
             reader.setInventoryCallback(null);
             UiDialogs.showOk(this, getString(R.string.error_start_read));
         }
     }
 
-    private void stopScan() {
-        if (reader != null && scanning) {
-            try {
-                reader.stopInventory();
-            } catch (Exception ignored) {
-            }
-            reader.setInventoryCallback(null);
+    private void pauseScanning() {
+        if (reader == null || !inventoryRunning) {
+            return;
         }
-        scanning = false;
-        tvToggle.setText(R.string.mass_read_start);
-        cardToggle.setCardBackgroundColor(ContextCompat.getColor(this, R.color.menu_card_white));
+        try {
+            reader.stopInventory();
+        } catch (Exception ignored) {
+        }
+        reader.setInventoryCallback(null);
+        inventoryRunning = false;
+        pausedAfterRun = true;
+        refreshScanButtons();
     }
 
-    private void onStoppedOfferExport() {
+    private void refreshScanButtons() {
+        if (inventoryRunning) {
+            cardStartContinue.setVisibility(View.GONE);
+            cardPause.setVisibility(View.VISIBLE);
+            LinearLayout.LayoutParams pp = (LinearLayout.LayoutParams) cardPause.getLayoutParams();
+            pp.weight = 1f;
+            cardPause.setLayoutParams(pp);
+        } else {
+            cardStartContinue.setVisibility(View.VISIBLE);
+            cardPause.setVisibility(View.GONE);
+            LinearLayout.LayoutParams ps = (LinearLayout.LayoutParams) cardStartContinue.getLayoutParams();
+            ps.weight = 1f;
+            cardStartContinue.setLayoutParams(ps);
+            tvStartContinue.setText(pausedAfterRun ? R.string.mass_read_resume : R.string.mass_read_start);
+        }
+    }
+
+    private void beginExportFlow() {
         if (tagOrder.isEmpty()) {
             UiDialogs.showOk(this, getString(R.string.mass_read_empty_export));
             return;
@@ -183,6 +202,52 @@ public class MassReadActivity extends AppCompatActivity {
             return;
         }
         runExportIfPossible();
+    }
+
+    private void performClear() {
+        if (inventoryRunning && reader != null) {
+            try {
+                reader.stopInventory();
+            } catch (Exception ignored) {
+            }
+            reader.setInventoryCallback(null);
+        }
+        inventoryRunning = false;
+        pausedAfterRun = false;
+        tagOrder.clear();
+        seenNorm.clear();
+        totalReadEvents = 0;
+        liveAdapter.clear();
+        updateCountLabel();
+        refreshScanButtons();
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        finish();
+        return true;
+    }
+
+    private void initReader() {
+        try {
+            reader = RFIDWithUHFUART.getInstance();
+            if (reader == null || !reader.init(this)) {
+                UiDialogs.showOk(this, getString(R.string.rfid_init_failed));
+                cardStartContinue.setEnabled(false);
+                cardPause.setEnabled(false);
+                return;
+            }
+            ReaderPrefs.applyToReader(this, reader);
+        } catch (Exception e) {
+            UiDialogs.showOk(this, getString(R.string.rfid_config_error,
+                    e.getMessage() != null ? e.getMessage() : ""));
+            cardStartContinue.setEnabled(false);
+            cardPause.setEnabled(false);
+        }
+    }
+
+    private void updateCountLabel() {
+        tvCount.setText(getString(R.string.mass_read_count_detailed, tagOrder.size(), totalReadEvents));
     }
 
     private boolean hasLocationPermission() {
@@ -207,6 +272,10 @@ public class MassReadActivity extends AppCompatActivity {
             UiDialogs.showOk(this, getString(R.string.mass_read_need_filename));
             return;
         }
+        if (tagOrder.isEmpty()) {
+            UiDialogs.showOk(this, getString(R.string.mass_read_empty_export));
+            return;
+        }
         final String prefix = SedePrefix.forSedeDisplayName(ubicacion);
         final String sanitized = ExportFileNamer.sanitizeScanName(base);
         final String date = new SimpleDateFormat("yyyyMMdd", Locale.US).format(new Date());
@@ -217,11 +286,15 @@ public class MassReadActivity extends AppCompatActivity {
         io.execute(() -> {
             try {
                 String coord = ExportLocationHelper.getCoordinatesForExport(getApplicationContext());
-                PublicDownloadsExport.insertWriteAndPublish(getApplicationContext(), displayName,
+                android.net.Uri uri = PublicDownloadsExport.insertWriteAndPublish(getApplicationContext(),
+                        displayName,
                         out -> ConciliationReportWriter.writeMassInventoryRead(out, snapshot, ubi, coord));
                 runOnUiThread(() -> UiDialogs.showOk(this,
                         getString(R.string.mass_read_export_ok,
-                                PublicDownloadsExport.DOWNLOADS_SUBFOLDER, displayName)));
+                                PublicDownloadsExport.DOWNLOADS_SUBFOLDER, displayName),
+                        () -> ShareExportHelper.shareSingleSpreadsheet(this, uri,
+                                getString(R.string.mass_read_export_subject),
+                                getString(R.string.export_chooser))));
             } catch (Exception e) {
                 runOnUiThread(() -> UiDialogs.showOk(this,
                         getString(R.string.mass_read_export_fail,
@@ -232,7 +305,14 @@ public class MassReadActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        stopScan();
+        if (inventoryRunning && reader != null) {
+            try {
+                reader.stopInventory();
+            } catch (Exception ignored) {
+            }
+            reader.setInventoryCallback(null);
+        }
+        inventoryRunning = false;
         io.shutdown();
         try {
             io.awaitTermination(5, TimeUnit.SECONDS);

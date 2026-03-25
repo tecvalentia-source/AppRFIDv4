@@ -55,26 +55,34 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/settings_region_label"
+            android:layout_marginTop="20dp"
+            android:text="@string/settings_volume_label"
             android:textColor="@color/menu_text_on_colored"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvVolumeValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="@color/menu_text_on_colored"
+            android:textSize="16sp"
             android:textStyle="bold" />
 
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
             app:cardBackgroundColor="@color/menu_card_white"
             app:cardCornerRadius="16dp"
             app:cardElevation="4dp">
 
-            <Spinner
-                android:id="@+id/spinnerRegion"
+            <SeekBar
+                android:id="@+id/seekAlertVolume"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:minHeight="48dp"
-                android:padding="4dp"
-                android:popupTheme="@style/ThemeOverlay.AppCompat.Light" />
+                android:max="100"
+                android:padding="16dp" />
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.card.MaterialCardView

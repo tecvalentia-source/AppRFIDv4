@@ -33,6 +33,15 @@
             android:textSize="13sp"
             tools:text="-55 dBm" />
 
+        <TextView
+            android:id="@+id/tvFilterReads"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="@color/black"
+            android:textSize="13sp"
+            tools:text="Lecturas: 12" />
+
         <ProgressBar
             android:id="@+id/progressFilterRow"
             style="?android:attr/progressBarStyleHorizontal"
@@ -40,6 +49,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:max="100"
+            android:progress="0"
             android:progressTint="@color/menu_card_orange" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
