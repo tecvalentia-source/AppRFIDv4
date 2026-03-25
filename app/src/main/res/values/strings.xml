@@ -28,7 +28,7 @@
     <string name="filter_mode_individual">Individual</string>
     <string name="filter_mode_grouped">Agrupado</string>
     <string name="filter_digits_hint">Dígitos o texto del RFID (filtro)</string>
-    <string name="filter_digits_field_hint">Ej: E280, 1191, ABC…</string>
+    <string name="filter_digits_field_hint">Individual: EPC exacto · Agrupado: parte del EPC</string>
     <string name="filter_start_scan">Iniciar escaneo</string>
     <string name="filter_stop_scan">Detener</string>
     <string name="filter_need_digits">Ingrese al menos un carácter para filtrar.</string>
@@ -45,6 +45,8 @@
     <string name="filter_export_ok">Archivo guardado en Descargas/%1$s\n\n%2$s</string>
     <string name="filter_export_subject">Filtro agrupado RFID</string>
     <string name="filter_export_chooser">Compartir archivo</string>
+    <string name="filter_grouped_clear">Limpiar</string>
+    <string name="filter_grouped_clear_confirm">¿Vaciar la lista, reiniciar contadores y borrar el texto de búsqueda? Si el escaneo está activo, se detendrá.</string>
 
     <string name="mass_read_title">Lectura masiva</string>
     <string name="mass_read_file_label">Nombre de archivo</string>
@@ -57,8 +59,10 @@
     <string name="mass_read_clear_confirm">¿Detener la lectura (si está activa) y borrar todos los datos de la pantalla?</string>
     <string name="mass_read_export_confirm">¿Generar el archivo y guardarlo en Descargas con las coordenadas actuales?</string>
     <string name="mass_read_export_subject">Lectura masiva RFID</string>
-    <string name="mass_read_live_hint">Lecturas en vivo (más reciente arriba)</string>
-    <string name="mass_read_count_detailed">Únicos: %1$d · Lecturas: %2$d</string>
+    <string name="mass_read_count_detailed">RFID distintos: %1$d · Lecturas totales: %2$d</string>
+    <string name="mass_read_col_rfid">RFID</string>
+    <string name="mass_read_col_count">Cantidad</string>
+    <string name="mass_read_col_rssi">RSSI</string>
     <string name="mass_read_empty_export">No hay etiquetas para exportar.</string>
     <string name="mass_read_need_filename">Escriba un nombre de archivo.</string>
     <string name="mass_read_export_ok">Archivo guardado en Descargas/%1$s\n\n%2$s</string>

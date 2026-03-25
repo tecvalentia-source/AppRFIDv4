@@ -63,6 +63,7 @@ public class FilterScanActivity extends AppCompatActivity {
     private RecyclerView rvGrouped;
     private TextView tvGroupedStats;
     private MaterialCardView cardExportGrouped;
+    private MaterialCardView cardClearGrouped;
     private Switch switchBeep;
     private SeekBar seekBeepVolume;
     private TextView tvBeepVolumeLabel;
@@ -110,6 +111,7 @@ public class FilterScanActivity extends AppCompatActivity {
         rvGrouped = findViewById(R.id.rvFilterGrouped);
         tvGroupedStats = findViewById(R.id.tvGroupedStats);
         cardExportGrouped = findViewById(R.id.cardExportGrouped);
+        cardClearGrouped = findViewById(R.id.cardClearGrouped);
         switchBeep = findViewById(R.id.switchFilterBeep);
         seekBeepVolume = findViewById(R.id.seekFilterBeepVolume);
         tvBeepVolumeLabel = findViewById(R.id.tvFilterBeepVolumeLabel);
@@ -163,6 +165,9 @@ public class FilterScanActivity extends AppCompatActivity {
         cardExportGrouped.setOnClickListener(v -> UiDialogs.showConfirm(this,
                 getString(R.string.filter_export_confirm),
                 this::exportGroupedResults));
+        cardClearGrouped.setOnClickListener(v -> UiDialogs.showConfirm(this,
+                getString(R.string.filter_grouped_clear_confirm),
+                this::performGroupedClear));
 
         initReader();
     }
@@ -277,6 +282,16 @@ public class FilterScanActivity extends AppCompatActivity {
         }
     }
 
+    private void performGroupedClear() {
+        if (scanning) {
+            stopScanInternal();
+            tvToggle.setText(R.string.filter_start_scan);
+            setToggleCardColor(false);
+        }
+        resetGroupedList();
+        etFilter.setText("");
+    }
+
     private void exportGroupedResults() {
         if (groupedMap.isEmpty()) {
             UiDialogs.showOk(this, getString(R.string.filter_export_empty));
@@ -311,9 +326,15 @@ public class FilterScanActivity extends AppCompatActivity {
         if (epc == null || epc.isEmpty()) {
             return;
         }
-        String epcU = epc.toUpperCase(Locale.ROOT);
-        String needleU = needle.toUpperCase(Locale.ROOT);
-        if (!epcU.contains(needleU)) {
+        String epcTrim = epc.trim();
+
+        if (groupedMode) {
+            String epcU = epcTrim.toUpperCase(Locale.ROOT);
+            String needleU = needle.toUpperCase(Locale.ROOT);
+            if (!epcU.contains(needleU)) {
+                return;
+            }
+        } else if (!epcTrim.equals(needle)) {
             return;
         }
 
@@ -328,13 +349,13 @@ public class FilterScanActivity extends AppCompatActivity {
             }
             FilterTagRow prev = groupedMap.get(key);
             int count = prev == null ? 1 : prev.readCount + 1;
-            groupedMap.put(key, new FilterTagRow(epc.trim(), db, rssiStr, count));
+            groupedMap.put(key, new FilterTagRow(epcTrim, db, rssiStr, count));
             groupedAdapter.setRows(new ArrayList<>(groupedMap.values()));
             updateGroupedStatsLabel();
             return;
         }
 
-        tvIndEpc.setText(epc.trim());
+        tvIndEpc.setText(epcTrim);
         tvIndRssi.setText(getString(R.string.filter_rssi_numeric, db));
         int pct = RssiUiUtils.proximityPercent(db);
         progressInd.setProgress(pct);

@@ -9,28 +9,66 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 public class MassReadLiveAdapter extends RecyclerView.Adapter<MassReadLiveAdapter.VH> {
 
-    private static final int MAX_ROWS = 3000;
-
     private final List<MassLiveRow> items = new ArrayList<>();
+    private final Map<String, Integer> normToIndex = new HashMap<>();
 
-    public void prepend(@NonNull MassLiveRow row) {
-        items.add(0, row);
-        if (items.size() > MAX_ROWS) {
-            items.remove(items.size() - 1);
-            notifyDataSetChanged();
-        } else {
-            notifyItemInserted(0);
+    private static String mapKey(@NonNull String epcDisplay) {
+        String norm = RfidNormalizer.normalize(epcDisplay);
+        if (!norm.isEmpty()) {
+            return norm;
         }
+        return epcDisplay.trim().toUpperCase(Locale.ROOT);
+    }
+
+    /**
+     * Si el RFID ya existe: incrementa cantidad y actualiza RSSI. Si no, añade fila.
+     * @return índice de la fila afectada (nueva o actualizada).
+     */
+    public int upsertTag(@NonNull String epcDisplay, @NonNull String rssiRaw, int rssiDbm) {
+        String key = mapKey(epcDisplay);
+        Integer idxObj = normToIndex.get(key);
+        if (idxObj != null) {
+            int idx = idxObj;
+            MassLiveRow r = items.get(idx);
+            r.readCount++;
+            r.rssiRaw = rssiRaw;
+            r.rssiDbm = rssiDbm;
+            notifyItemChanged(idx);
+            return idx;
+        }
+        MassLiveRow row = new MassLiveRow(epcDisplay, rssiRaw, rssiDbm);
+        items.add(row);
+        int pos = items.size() - 1;
+        normToIndex.put(key, pos);
+        notifyItemInserted(pos);
+        return pos;
     }
 
     public void clear() {
-        int n = items.size();
         items.clear();
-        notifyItemRangeRemoved(0, n);
+        normToIndex.clear();
+        notifyDataSetChanged();
+    }
+
+    public boolean isEmpty() {
+        return items.isEmpty();
+    }
+
+    /** EPCs en orden de primera aparición (para exportar). */
+    @NonNull
+    public List<String> getOrderedEpcsForExport() {
+        List<String> out = new ArrayList<>(items.size());
+        for (MassLiveRow r : items) {
+            out.add(r.epc);
+        }
+        return out;
     }
 
     @NonNull
@@ -45,6 +83,7 @@ public class MassReadLiveAdapter extends RecyclerView.Adapter<MassReadLiveAdapte
     public void onBindViewHolder(@NonNull VH h, int position) {
         MassLiveRow r = items.get(position);
         h.tvEpc.setText(r.epc);
+        h.tvCount.setText(String.valueOf(r.readCount));
         h.tvRssi.setText(RssiUiUtils.formatDbmDisplay(r.rssiRaw));
     }
 
@@ -55,11 +94,13 @@ public class MassReadLiveAdapter extends RecyclerView.Adapter<MassReadLiveAdapte
 
     static class VH extends RecyclerView.ViewHolder {
         final TextView tvEpc;
+        final TextView tvCount;
         final TextView tvRssi;
 
         VH(View v) {
             super(v);
             tvEpc = v.findViewById(R.id.tvMassLiveEpc);
+            tvCount = v.findViewById(R.id.tvMassLiveCount);
             tvRssi = v.findViewById(R.id.tvMassLiveRssi);
         }
     }

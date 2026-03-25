@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
@@ -23,29 +24,23 @@ import com.rscja.deviceapi.entity.InventoryParameter;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 import com.rscja.deviceapi.interfaces.IUHFInventoryCallback;
 
-import android.widget.ArrayAdapter;
-
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Inventario masivo con lista en vivo, pausa/reanudación y exportación con compartir.
+ * Inventario masivo: filas únicas por RFID (cantidad + RSSI actual), pausa/reanudación y exportación.
  */
 public class MassReadActivity extends AppCompatActivity {
 
     private RFIDWithUHFUART reader;
     private boolean inventoryRunning;
     private boolean pausedAfterRun;
-    private final ArrayList<String> tagOrder = new ArrayList<>();
-    private final Set<String> seenNorm = new HashSet<>();
     private int totalReadEvents;
 
     private EditText etFileName;
@@ -85,12 +80,8 @@ public class MassReadActivity extends AppCompatActivity {
             int db = RssiUiUtils.parseRssiDbm(rssiStr);
             runOnUiThread(() -> {
                 totalReadEvents++;
-                liveAdapter.prepend(new MassLiveRow(trimmed, rssiStr, db));
-                rvLive.scrollToPosition(0);
-                String norm = RfidNormalizer.normalize(trimmed);
-                if (!norm.isEmpty() && seenNorm.add(norm)) {
-                    tagOrder.add(trimmed);
-                }
+                int pos = liveAdapter.upsertTag(trimmed, rssiStr, db);
+                rvLive.scrollToPosition(pos);
                 updateCountLabel();
             });
         }
@@ -186,7 +177,7 @@ public class MassReadActivity extends AppCompatActivity {
     }
 
     private void beginExportFlow() {
-        if (tagOrder.isEmpty()) {
+        if (liveAdapter.isEmpty()) {
             UiDialogs.showOk(this, getString(R.string.mass_read_empty_export));
             return;
         }
@@ -214,8 +205,6 @@ public class MassReadActivity extends AppCompatActivity {
         }
         inventoryRunning = false;
         pausedAfterRun = false;
-        tagOrder.clear();
-        seenNorm.clear();
         totalReadEvents = 0;
         liveAdapter.clear();
         updateCountLabel();
@@ -247,7 +236,8 @@ public class MassReadActivity extends AppCompatActivity {
     }
 
     private void updateCountLabel() {
-        tvCount.setText(getString(R.string.mass_read_count_detailed, tagOrder.size(), totalReadEvents));
+        tvCount.setText(getString(R.string.mass_read_count_detailed,
+                liveAdapter.getItemCount(), totalReadEvents));
     }
 
     private boolean hasLocationPermission() {
@@ -272,7 +262,7 @@ public class MassReadActivity extends AppCompatActivity {
             UiDialogs.showOk(this, getString(R.string.mass_read_need_filename));
             return;
         }
-        if (tagOrder.isEmpty()) {
+        if (liveAdapter.isEmpty()) {
             UiDialogs.showOk(this, getString(R.string.mass_read_empty_export));
             return;
         }
@@ -280,7 +270,7 @@ public class MassReadActivity extends AppCompatActivity {
         final String sanitized = ExportFileNamer.sanitizeScanName(base);
         final String date = new SimpleDateFormat("yyyyMMdd", Locale.US).format(new Date());
         final String displayName = ExportFileNamer.buildMassReadFileName(prefix, sanitized, date);
-        final List<String> snapshot = new ArrayList<>(tagOrder);
+        final List<String> snapshot = new ArrayList<>(liveAdapter.getOrderedEpcsForExport());
         final String ubi = ubicacion;
 
         io.execute(() -> {
