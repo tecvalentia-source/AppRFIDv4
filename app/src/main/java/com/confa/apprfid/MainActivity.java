@@ -249,6 +249,7 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG, "RFID config", e);
             Toast.makeText(this, "Error de configuración del lector: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
+        newSession();
 
         applyModeToUi();
         refreshActionStates();
