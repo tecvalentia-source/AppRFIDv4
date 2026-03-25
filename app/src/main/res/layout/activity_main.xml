@@ -146,14 +146,14 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/counter_unique"
-                    tools:text="Únicos: 0" />
+                    />
 
                 <TextView
                     android:id="@+id/tvCounterTotal"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/counter_total"
-                    tools:text="Lecturas: 0" />
+                     />
 
                 <TextView
                     android:id="@+id/tvMissingFound"

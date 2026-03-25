@@ -33,8 +33,8 @@
     <string name="scan_status_paused">En pausa</string>
     <string name="scan_status_done">Sesión finalizada</string>
 
-    <string name="counter_unique">Únicos: %1$d</string>
-    <string name="counter_total">Lecturas: %1$d</string>
+    <string name="counter_unique">Únicos: 0</string>
+    <string name="counter_total">Lecturas: 0</string>
     <string name="counter_missing_found">Faltantes localizados: %1$d / %2$d</string>
 
     <string name="col_rfid">RFID</string>

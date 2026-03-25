@@ -8,7 +8,8 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 /**
  * Genera archivos con extensión {@code .xls} como tabla HTML (Excel y apps de hojas lo abren sin Apache POI).
  */
@@ -29,7 +30,7 @@ public final class ConciliationReportWriter {
 
     public static void writeExitosos(OutputStream out, List<MasterRecord> data, String coordenadas)
             throws IOException {
-        String[] headers = {"RFID", "Ubicacion", "Responsable", "Sede", "Coordenadas"};
+        String[] headers = {"RFID", "Ubicacion", "Responsable", "Coordenadas"};
         List<String[]> rows = new ArrayList<>();
         String c = safeCoord(coordenadas);
         if (data != null) {
@@ -41,12 +42,11 @@ public final class ConciliationReportWriter {
                         safe(rec.rfid),
                         safe(rec.ubicacion),
                         safe(rec.responsable),
-                        safe(rec.sede),
                         c
                 });
             }
         }
-        writeHtmlSpreadsheet(out, "Exitosos", headers, rows);
+        writeXlsxSpreadsheet(out, "Exitosos", headers, rows);
     }
 
     public static void writeSobrantes(File file, List<SobranteRow> data, String coordenadas) throws IOException {
@@ -76,7 +76,7 @@ public final class ConciliationReportWriter {
                 rows.add(new String[]{safe(r.rfid), motivoTxt, safe(ubi), c});
             }
         }
-        writeHtmlSpreadsheet(out, "Sobrantes", headers, rows);
+        writeXlsxSpreadsheet(out, "Sobrantes", headers, rows);
     }
 
     public static void writeFaltantes(File file, List<MasterRecord> data, String coordenadas) throws IOException {
@@ -91,9 +91,9 @@ public final class ConciliationReportWriter {
 
     public static void writeFaltantes(OutputStream out, List<MasterRecord> data, String coordenadas)
             throws IOException {
-        String[] headers = {"RFID", "Ubicacion", "Responsable", "Sede", "Coordenadas"};
+        String[] headers = {"RFID", "Ubicacion", "Responsable"};
         List<String[]> rows = new ArrayList<>();
-        String c = safeCoord(coordenadas);
+
         if (data != null) {
             for (MasterRecord rec : data) {
                 if (rec == null) {
@@ -102,13 +102,11 @@ public final class ConciliationReportWriter {
                 rows.add(new String[]{
                         safe(rec.rfid),
                         safe(rec.ubicacion),
-                        safe(rec.responsable),
-                        safe(rec.sede),
-                        c
+                        safe(rec.responsable)
                 });
             }
         }
-        writeHtmlSpreadsheet(out, "Faltantes", headers, rows);
+        writeXlsxSpreadsheet(out, "Faltantes", headers, rows);
     }
 
     public static void writeMissingSearchReport(File file, List<MissingSearchResultRow> data, String coordenadas)
@@ -140,7 +138,7 @@ public final class ConciliationReportWriter {
                 });
             }
         }
-        writeHtmlSpreadsheet(out, "Faltantes", headers, rows);
+        writeXlsxSpreadsheet(out, "Faltantes", headers, rows);
     }
 
     private static String safeCoord(String coordenadas) {
@@ -150,6 +148,51 @@ public final class ConciliationReportWriter {
         return coordenadas.trim();
     }
 
+    private static void writeXlsxSpreadsheet(OutputStream rawOut, String sheetTitle, String[] headers,
+                                             List<String[]> rows) throws IOException {
+        // 1. Crear el libro de trabajo (.xlsx)
+        Workbook workbook = new XSSFWorkbook();
+
+        // 2. Crear la hoja con el título proporcionado
+        Sheet sheet = workbook.createSheet(sheetTitle);
+
+        // Estilo para el encabezado (Negrita)
+        CellStyle headerStyle = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        headerStyle.setFont(font);
+        headerStyle.setBorderBottom(BorderStyle.THIN);
+
+        // 3. Crear la fila de encabezados
+        Row headerRow = sheet.createRow(0);
+        for (int i = 0; i < headers.length; i++) {
+            Cell cell = headerRow.createCell(i);
+            cell.setCellValue(headers[i]);
+            cell.setCellStyle(headerStyle);
+        }
+
+        // 4. Llenar los datos
+        int rowNum = 1;
+        for (String[] rowData : rows) {
+            Row row = sheet.createRow(rowNum++);
+            if (rowData != null) {
+                for (int i = 0; i < rowData.length; i++) {
+                    row.createCell(i).setCellValue(rowData[i]);
+                }
+            }
+        }
+
+
+        // 6. Escribir el archivo al OutputStream y cerrar
+        try {
+            workbook.write(rawOut);
+        } finally {
+            workbook.close();
+            if (rawOut != null) {
+                rawOut.close();
+            }
+        }
+    }
     private static void writeHtmlSpreadsheet(OutputStream rawOut, String sheetTitle, String[] headers,
             List<String[]> rows) throws IOException {
         StringBuilder sb = new StringBuilder(rows.size() * 64 + 256);
