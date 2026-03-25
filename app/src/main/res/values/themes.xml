@@ -12,4 +12,15 @@
         <item name="android:navigationBarColor">@color/menu_background_blue</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
+
+    <style name="Theme.AppRFID.MainScan" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@color/menu_background_blue</item>
+        <item name="android:navigationBarColor">@color/menu_background_blue</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@color/menu_background_blue</item>
+    </style>
+
+    <style name="ThemeOverlay.AppRFID.MaterialAlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="colorSurface">@color/menu_card_white</item>
+    </style>
 </resources>

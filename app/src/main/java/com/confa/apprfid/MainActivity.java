@@ -16,20 +16,22 @@ import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.deviceapi.entity.InventoryParameter;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
@@ -81,14 +83,16 @@ public class MainActivity extends AppCompatActivity {
 
     private Spinner spinnerSede;
     private Spinner spinnerMode;
-    private Button btnImportMaster;
-    private Button btnImportMissing;
-    private Button btnNewSession;
-    private Button btnStartScan;
-    private Button btnPause;
-    private Button btnResume;
-    private Button btnFinalize;
-    private Button btnExportReports;
+    private MaterialCardView cardImportMaster;
+    private MaterialCardView cardImportMissing;
+    private MaterialCardView cardStartScan;
+    private MaterialCardView cardPause;
+    private MaterialCardView cardResume;
+    private MaterialCardView cardFinalize;
+    private MaterialCardView cardNewSession;
+    private MaterialCardView cardExportReports;
+    private View rowHeadersMaster;
+    private View rowHeadersMissing;
     private RecyclerView rvMaster;
     private TextView tvScanStatus;
     private TextView tvCounterUnique;
@@ -97,6 +101,7 @@ public class MainActivity extends AppCompatActivity {
     private View overlayLoading;
 
     private final MasterRecordsAdapter masterAdapter = new MasterRecordsAdapter();
+    private MissingRfidAdapter missingAdapter;
 
     private AppMode appMode = AppMode.RECONCILE;
 
@@ -147,6 +152,10 @@ public class MainActivity extends AppCompatActivity {
                 tvMissingFound.setText(getString(R.string.counter_missing_found,
                         foundMissingKeys.size(), missingTargetKeys.size()));
             }
+            if (appMode == AppMode.MISSING_SEARCH && rvMaster != null
+                    && rvMaster.getAdapter() == missingAdapter && missingAdapter != null) {
+                missingAdapter.notifyDataSetChanged();
+            }
         }
     };
 
@@ -159,15 +168,18 @@ public class MainActivity extends AppCompatActivity {
 
         spinnerSede = findViewById(R.id.spinnerSede);
         spinnerMode = findViewById(R.id.spinnerMode);
-        btnImportMaster = findViewById(R.id.btnImportMaster);
-        btnImportMissing = findViewById(R.id.btnImportMissing);
-        btnNewSession = findViewById(R.id.btnNewSession);
-        btnStartScan = findViewById(R.id.btnStartScan);
-        btnPause = findViewById(R.id.btnPause);
-        btnResume = findViewById(R.id.btnResume);
-        btnFinalize = findViewById(R.id.btnFinalize);
-        btnExportReports = findViewById(R.id.btnExportReports);
+        cardImportMaster = findViewById(R.id.cardImportMaster);
+        cardImportMissing = findViewById(R.id.cardImportMissing);
+        cardStartScan = findViewById(R.id.cardStartScan);
+        cardPause = findViewById(R.id.cardPause);
+        cardResume = findViewById(R.id.cardResume);
+        cardFinalize = findViewById(R.id.cardFinalize);
+        cardNewSession = findViewById(R.id.cardNewSession);
+        cardExportReports = findViewById(R.id.cardExportReports);
+        rowHeadersMaster = findViewById(R.id.rowHeadersMaster);
+        rowHeadersMissing = findViewById(R.id.rowHeadersMissing);
         rvMaster = findViewById(R.id.rvMaster);
+        missingAdapter = new MissingRfidAdapter(foundMissingKeys);
         tvScanStatus = findViewById(R.id.tvScanStatus);
         tvCounterUnique = findViewById(R.id.tvCounterUnique);
         tvCounterTotal = findViewById(R.id.tvCounterTotal);
@@ -201,6 +213,7 @@ public class MainActivity extends AppCompatActivity {
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 appMode = position == 0 ? AppMode.RECONCILE : AppMode.MISSING_SEARCH;
                 applyModeToUi();
+                applyListUiForMode();
                 refreshActionStates();
             }
 
@@ -210,19 +223,18 @@ public class MainActivity extends AppCompatActivity {
         });
 
         rvMaster.setLayoutManager(new LinearLayoutManager(this));
-        rvMaster.setAdapter(masterAdapter);
         rvMaster.setHasFixedSize(true);
         rvMaster.setItemViewCacheSize(40);
         rvMaster.setItemAnimator(null);
 
-        btnImportMaster.setOnClickListener(v -> pickMasterLauncher.launch(new String[]{"*/*"}));
-        btnImportMissing.setOnClickListener(v -> pickMissingLauncher.launch(new String[]{"*/*"}));
-        btnNewSession.setOnClickListener(v -> confirmNewSession());
-        btnStartScan.setOnClickListener(v -> startScanning());
-        btnPause.setOnClickListener(v -> pauseScanning());
-        btnResume.setOnClickListener(v -> resumeScanning());
-        btnFinalize.setOnClickListener(v -> finalizeSession());
-        btnExportReports.setOnClickListener(v -> exportReports());
+        cardImportMaster.setOnClickListener(v -> pickMasterLauncher.launch(new String[]{"*/*"}));
+        cardImportMissing.setOnClickListener(v -> pickMissingLauncher.launch(new String[]{"*/*"}));
+        cardNewSession.setOnClickListener(v -> confirmNewSession());
+        cardStartScan.setOnClickListener(v -> startScanning());
+        cardPause.setOnClickListener(v -> pauseScanning());
+        cardResume.setOnClickListener(v -> resumeScanning());
+        cardFinalize.setOnClickListener(v -> finalizeSession());
+        cardExportReports.setOnClickListener(v -> exportReports());
 
         etScanName.addTextChangedListener(new TextWatcher() {
             @Override
@@ -242,23 +254,90 @@ public class MainActivity extends AppCompatActivity {
         try {
             mReader = RFIDWithUHFUART.getInstance();
             if (mReader != null && !mReader.init(this)) {
-                Toast.makeText(this, "Error al inicializar el hardware RFID.", Toast.LENGTH_LONG).show();
+                showAlert(getString(R.string.rfid_init_failed));
                 Log.e(TAG, "RFID init failed");
             }
         } catch (Exception e) {
             Log.e(TAG, "RFID config", e);
-            Toast.makeText(this, "Error de configuración del lector: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            showAlert(getString(R.string.rfid_config_error, e.getMessage() != null ? e.getMessage() : ""));
         }
-        newSession();
+
+        tvCounterUnique.setText(getString(R.string.counter_unique, 0));
+        tvCounterTotal.setText(getString(R.string.counter_total, 0));
 
         applyModeToUi();
+        applyListUiForMode();
         refreshActionStates();
         updateScanStatusIdle();
     }
 
+    private void showAlert(@NonNull CharSequence message) {
+        showAlert(message, null);
+    }
+
+    private void showAlert(@NonNull CharSequence message, @Nullable Runnable onOk) {
+        new MaterialAlertDialogBuilder(this, R.style.ThemeOverlay_AppRFID_MaterialAlertDialog)
+                .setMessage(message)
+                .setPositiveButton(R.string.dialog_ok, (d, w) -> {
+                    d.dismiss();
+                    if (onOk != null) {
+                        onOk.run();
+                    }
+                })
+                .show();
+    }
+
+    private void showAlert(@StringRes int messageResId) {
+        showAlert(getString(messageResId));
+    }
+
+    /**
+     * Lista maestro filtrado por sede o lista de faltantes importada, según el modo.
+     */
+    private void applyListUiForMode() {
+        if (appMode == AppMode.RECONCILE) {
+            rowHeadersMaster.setVisibility(View.VISIBLE);
+            rowHeadersMissing.setVisibility(View.GONE);
+            if (rvMaster.getAdapter() != masterAdapter) {
+                rvMaster.setAdapter(masterAdapter);
+            }
+            rebuildFilteredMasterForSelectedSede();
+        } else {
+            rowHeadersMaster.setVisibility(View.GONE);
+            rowHeadersMissing.setVisibility(View.VISIBLE);
+            if (rvMaster.getAdapter() != missingAdapter) {
+                rvMaster.setAdapter(missingAdapter);
+            }
+            missingAdapter.setItems(missingOrderRaw);
+        }
+    }
+
+    private void refreshPauseResumeVisibility(boolean canResume) {
+        if (cardPause == null || cardResume == null) {
+            return;
+        }
+        if (sessionFinalized) {
+            cardPause.setVisibility(View.GONE);
+            cardResume.setVisibility(View.GONE);
+            return;
+        }
+        if (inventoryRunning) {
+            cardPause.setVisibility(View.VISIBLE);
+            cardResume.setVisibility(View.GONE);
+            cardPause.setEnabled(true);
+        } else if (scanSessionStarted) {
+            cardPause.setVisibility(View.GONE);
+            cardResume.setVisibility(View.VISIBLE);
+            enableIfChanged(cardResume, canResume);
+        } else {
+            cardPause.setVisibility(View.GONE);
+            cardResume.setVisibility(View.GONE);
+        }
+    }
+
     private void applyModeToUi() {
         boolean missing = appMode == AppMode.MISSING_SEARCH;
-        btnImportMissing.setVisibility(missing ? View.VISIBLE : View.GONE);
+        cardImportMissing.setVisibility(missing ? View.VISIBLE : View.GONE);
         tvMissingFound.setVisibility(missing ? View.VISIBLE : View.GONE);
         if (!missing) {
             tvMissingFound.setText("");
@@ -277,22 +356,20 @@ public class MainActivity extends AppCompatActivity {
                         masterRecordsAll = new ArrayList<>(result.records);
                         masterByRfidAll = new HashMap<>(result.byNormalizedRfid);
                         rebuildFilteredMasterForSelectedSede();
-                        Toast.makeText(MainActivity.this,
-                                getString(R.string.import_ok, masterRecordsAll.size(), result.duplicateCount),
-                                Toast.LENGTH_LONG).show();
+                        StringBuilder msg = new StringBuilder(getString(R.string.import_ok,
+                                masterRecordsAll.size(), result.duplicateCount));
                         if (!masterRecordsAll.isEmpty() && masterByRfidFiltered.isEmpty()) {
-                            Toast.makeText(MainActivity.this,
-                                    getString(R.string.import_ok_filtered_empty,
-                                            masterRecordsAll.size(), getSelectedSede()),
-                                    Toast.LENGTH_LONG).show();
+                            msg.append("\n\n").append(getString(R.string.import_ok_filtered_empty,
+                                    masterRecordsAll.size(), getSelectedSede()));
                         }
+                        showAlert(msg);
                         refreshActionStates();
                     }
 
                     @Override
                     public void onFailure(@NonNull String message) {
                         setLoadingOverlayVisible(false);
-                        Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
+                        showAlert(message);
                     }
                 });
     }
@@ -314,16 +391,15 @@ public class MainActivity extends AppCompatActivity {
                                 missingTargetKeys.add(k);
                             }
                         }
-                        Toast.makeText(MainActivity.this,
-                                getString(R.string.import_missing_ok, missingOrderRaw.size()),
-                                Toast.LENGTH_LONG).show();
+                        showAlert(getString(R.string.import_missing_ok, missingOrderRaw.size()));
+                        applyListUiForMode();
                         refreshActionStates();
                     }
 
                     @Override
                     public void onFailure(@NonNull String message) {
                         setLoadingOverlayVisible(false);
-                        Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
+                        showAlert(message);
                     }
                 });
     }
@@ -386,11 +462,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void confirmNewSession() {
         if (inventoryRunning) {
-            Toast.makeText(this, "Detenga el escaneo antes de iniciar una nueva sesión.", Toast.LENGTH_SHORT).show();
+            showAlert(getString(R.string.new_session_need_stop_scan));
             return;
         }
         newSession();
-        Toast.makeText(this, R.string.new_session_cleared, Toast.LENGTH_SHORT).show();
+        showAlert(getString(R.string.new_session_cleared));
     }
 
     private void newSession() {
@@ -408,7 +484,6 @@ public class MainActivity extends AppCompatActivity {
         masterByRfidFiltered.clear();
         missingOrderRaw = new ArrayList<>();
         missingTargetKeys.clear();
-        masterAdapter.setItems(new ArrayList<>());
         if (etScanName != null) {
             etScanName.setText("");
         }
@@ -419,6 +494,7 @@ public class MainActivity extends AppCompatActivity {
             tvMissingFound.setText(getString(R.string.counter_missing_found, 0, 0));
         }
         updateScanStatusIdle();
+        applyListUiForMode();
         refreshActionStates();
     }
 
@@ -426,26 +502,26 @@ public class MainActivity extends AppCompatActivity {
         if (mReader == null || inventoryRunning || sessionFinalized) return;
 
         if (!hasScanName()) {
-            Toast.makeText(this, R.string.need_scan_name, Toast.LENGTH_SHORT).show();
+            showAlert(R.string.need_scan_name);
             return;
         }
         String sede = getSelectedSede();
         if (sede.isEmpty()) {
-            Toast.makeText(this, R.string.need_sede, Toast.LENGTH_SHORT).show();
+            showAlert(R.string.need_sede);
             return;
         }
         if (appMode == AppMode.RECONCILE) {
             if (masterByRfidAll.isEmpty()) {
-                Toast.makeText(this, R.string.need_master, Toast.LENGTH_SHORT).show();
+                showAlert(R.string.need_master);
                 return;
             }
             if (masterByRfidFiltered.isEmpty()) {
-                Toast.makeText(this, R.string.need_master_sede, Toast.LENGTH_SHORT).show();
+                showAlert(R.string.need_master_sede);
                 return;
             }
         } else {
             if (missingTargetKeys.isEmpty()) {
-                Toast.makeText(this, R.string.need_missing_list, Toast.LENGTH_SHORT).show();
+                showAlert(R.string.need_missing_list);
                 return;
             }
         }
@@ -461,7 +537,7 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "startInventoryTag");
         } else {
             mReader.setInventoryCallback(null);
-            Toast.makeText(this, "Error al iniciar lectura", Toast.LENGTH_SHORT).show();
+            showAlert(getString(R.string.error_start_read));
         }
     }
 
@@ -487,19 +563,19 @@ public class MainActivity extends AppCompatActivity {
             refreshActionStates();
             Log.d(TAG, "pause stopInventory");
         } else {
-            Toast.makeText(this, "Error al pausar", Toast.LENGTH_SHORT).show();
+            showAlert(getString(R.string.error_pause_read));
         }
     }
 
     private void resumeScanning() {
         if (mReader == null || inventoryRunning || sessionFinalized) return;
         if (!hasScanName()) {
-            Toast.makeText(this, R.string.need_scan_name, Toast.LENGTH_SHORT).show();
+            showAlert(R.string.need_scan_name);
             return;
         }
         String sede = getSelectedSede();
         if (sede.isEmpty()) {
-            Toast.makeText(this, R.string.need_sede, Toast.LENGTH_SHORT).show();
+            showAlert(R.string.need_sede);
             return;
         }
         attachInventoryCallback();
@@ -512,7 +588,7 @@ public class MainActivity extends AppCompatActivity {
             refreshActionStates();
         } else {
             mReader.setInventoryCallback(null);
-            Toast.makeText(this, "Error al continuar lectura", Toast.LENGTH_SHORT).show();
+            showAlert(getString(R.string.error_resume_read));
         }
     }
 
@@ -529,18 +605,20 @@ public class MainActivity extends AppCompatActivity {
 
         String sede = getSelectedSede();
         if (sede.isEmpty()) {
-            Toast.makeText(this, R.string.need_sede, Toast.LENGTH_SHORT).show();
+            showAlert(R.string.need_sede);
             refreshActionStates();
             return;
         }
         if (!hasScanName()) {
-            Toast.makeText(this, R.string.need_scan_name, Toast.LENGTH_SHORT).show();
+            showAlert(R.string.need_scan_name);
             refreshActionStates();
             return;
         }
 
         tvScanStatus.setText(R.string.finalize_processing);
-        btnFinalize.setEnabled(false);
+        if (cardFinalize != null) {
+            cardFinalize.setEnabled(false);
+        }
 
         if (appMode == AppMode.RECONCILE) {
             final Map<String, MasterRecord> masterSnapshot = new HashMap<>(masterByRfidAll);
@@ -553,15 +631,13 @@ public class MainActivity extends AppCompatActivity {
                     lastReconciliation = result;
                     sessionFinalized = true;
                     tvScanStatus.setText(R.string.scan_status_done);
-                    Toast.makeText(this,
-                            "Conciliación: OK " + result.exitosos.size()
-                                    + " | Sobrantes " + result.sobrantes.size()
-                                    + " | Faltantes " + result.faltantes.size(),
-                            Toast.LENGTH_LONG).show();
+                    showAlert(getString(R.string.session_summary_reconcile,
+                            result.exitosos.size(), result.sobrantes.size(), result.faltantes.size()));
                     refreshActionStates();
                 });
             });
         } else {
+            final int totalFaltantesLista = missingTargetKeys.size();
             ioExecutor.execute(() -> {
                 List<MissingSearchResultRow> rows = new ArrayList<>(missingOrderRaw.size());
                 for (String raw : missingOrderRaw) {
@@ -569,11 +645,12 @@ public class MainActivity extends AppCompatActivity {
                     boolean ok = !k.isEmpty() && foundMissingKeys.contains(k);
                     rows.add(new MissingSearchResultRow(raw, ok, ok ? sede : ""));
                 }
+                final int localizados = foundMissingKeys.size();
                 mainHandler.post(() -> {
                     lastMissingReport = rows;
                     sessionFinalized = true;
                     tvScanStatus.setText(R.string.scan_status_done);
-                    Toast.makeText(this, "Búsqueda finalizada: " + rows.size() + " filas", Toast.LENGTH_SHORT).show();
+                    showAlert(getString(R.string.session_summary_missing, localizados, totalFaltantesLista));
                     refreshActionStates();
                 });
             });
@@ -590,7 +667,7 @@ public class MainActivity extends AppCompatActivity {
     private void exportReports() {
         if (!sessionFinalized) return;
         if (!hasScanName()) {
-            Toast.makeText(this, R.string.need_scan_name, Toast.LENGTH_SHORT).show();
+            showAlert(R.string.need_scan_name);
             return;
         }
         if (!hasLocationPermission()) {
@@ -608,7 +685,7 @@ public class MainActivity extends AppCompatActivity {
     private void executeExportDownloadTask() {
         if (!sessionFinalized) return;
         if (!hasScanName()) {
-            Toast.makeText(this, R.string.need_scan_name, Toast.LENGTH_SHORT).show();
+            showAlert(R.string.need_scan_name);
             return;
         }
 
@@ -647,12 +724,11 @@ public class MainActivity extends AppCompatActivity {
 
                     mainHandler.post(() -> {
                         setLoadingOverlayVisible(false);
-                        Toast.makeText(MainActivity.this,
-                                getString(R.string.export_saved_downloads, PublicDownloadsExport.DOWNLOADS_SUBFOLDER),
-                                Toast.LENGTH_LONG).show();
-                        shareExcelFilesAsChooser(uris,
-                                getString(R.string.export_subject_conciliation),
-                                getString(R.string.export_chooser_three_files));
+                        showAlert(getString(R.string.export_saved_downloads,
+                                PublicDownloadsExport.DOWNLOADS_SUBFOLDER), () ->
+                                shareExcelFilesAsChooser(uris,
+                                        getString(R.string.export_subject_conciliation),
+                                        getString(R.string.export_chooser_three_files)));
                     });
                 } else if (mode == AppMode.MISSING_SEARCH && missingSnapshot != null) {
                     String nBus = ExportFileNamer.buildFileName(prefix, scanSan, dateYyyyMmDd, "BUSQFAL");
@@ -662,30 +738,29 @@ public class MainActivity extends AppCompatActivity {
                     one.add(uri);
                     mainHandler.post(() -> {
                         setLoadingOverlayVisible(false);
-                        Toast.makeText(MainActivity.this,
-                                getString(R.string.export_saved_downloads, PublicDownloadsExport.DOWNLOADS_SUBFOLDER),
-                                Toast.LENGTH_LONG).show();
-                        shareExcelFilesAsChooser(one,
-                                getString(R.string.export_subject_missing),
-                                getString(R.string.export_chooser));
+                        showAlert(getString(R.string.export_saved_downloads,
+                                PublicDownloadsExport.DOWNLOADS_SUBFOLDER), () ->
+                                shareExcelFilesAsChooser(one,
+                                        getString(R.string.export_subject_missing),
+                                        getString(R.string.export_chooser)));
                     });
                 } else {
                     mainHandler.post(() -> {
                         setLoadingOverlayVisible(false);
-                        Toast.makeText(MainActivity.this, R.string.export_nothing, Toast.LENGTH_SHORT).show();
+                        showAlert(R.string.export_nothing);
                     });
                 }
             } catch (IOException e) {
                 Log.e(TAG, "export", e);
                 mainHandler.post(() -> {
                     setLoadingOverlayVisible(false);
-                    Toast.makeText(MainActivity.this, exportFailureMessage(e), Toast.LENGTH_LONG).show();
+                    showAlert(exportFailureMessage(e));
                 });
             } catch (RuntimeException e) {
                 Log.e(TAG, "export runtime", e);
                 mainHandler.post(() -> {
                     setLoadingOverlayVisible(false);
-                    Toast.makeText(MainActivity.this, exportFailureMessage(e), Toast.LENGTH_LONG).show();
+                    showAlert(exportFailureMessage(e));
                 });
             }
         });
@@ -726,7 +801,7 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(chooser);
             } catch (android.content.ActivityNotFoundException ex) {
                 Log.w(TAG, "share", ex);
-                Toast.makeText(this, R.string.export_io_error, Toast.LENGTH_SHORT).show();
+                showAlert(R.string.export_io_error);
             }
             return;
         }
@@ -750,7 +825,7 @@ public class MainActivity extends AppCompatActivity {
             startActivity(chooser);
         } catch (android.content.ActivityNotFoundException ex) {
             Log.w(TAG, "share multiple", ex);
-            Toast.makeText(this, R.string.export_io_error, Toast.LENGTH_SHORT).show();
+            showAlert(R.string.export_io_error);
         }
     }
 
@@ -770,29 +845,30 @@ public class MainActivity extends AppCompatActivity {
         boolean prereq = !getSelectedSede().isEmpty()
                 && (appMode == AppMode.RECONCILE ? masterReady : !missingTargetKeys.isEmpty());
         boolean canStart = !inventoryRunning && !sessionFinalized && prereq && !scanSessionStarted && scanOk;
+        boolean canResume = !inventoryRunning && !sessionFinalized && prereq && scanSessionStarted && scanOk;
 
-        enableIfChanged(btnStartScan, canStart);
-        enableIfChanged(btnPause, inventoryRunning);
-        enableIfChanged(btnResume, !inventoryRunning && !sessionFinalized && prereq && scanSessionStarted && scanOk);
+        enableIfChanged(cardStartScan, canStart);
         boolean canFinalize = !sessionFinalized
                 && scanOk
                 && !getSelectedSede().isEmpty()
                 && (appMode == AppMode.RECONCILE
                 ? masterReady
                 : !missingTargetKeys.isEmpty());
-        enableIfChanged(btnFinalize, canFinalize);
+        enableIfChanged(cardFinalize, canFinalize);
 
         boolean canExport = sessionFinalized && scanOk
                 && ((appMode == AppMode.RECONCILE && lastReconciliation != null)
                 || (appMode == AppMode.MISSING_SEARCH && lastMissingReport != null));
-        enableIfChanged(btnExportReports, canExport);
+        enableIfChanged(cardExportReports, canExport);
 
         boolean editingAllowed = !inventoryRunning && !sessionFinalized;
-        enableIfChanged(btnImportMaster, editingAllowed);
-        enableIfChanged(btnImportMissing, editingAllowed);
+        enableIfChanged(cardImportMaster, editingAllowed && appMode == AppMode.RECONCILE);
+        enableIfChanged(cardImportMissing, editingAllowed && appMode == AppMode.MISSING_SEARCH);
         enableIfChanged(spinnerMode, editingAllowed);
         enableIfChanged(spinnerSede, editingAllowed);
         enableIfChanged(etScanName, editingAllowed);
+
+        refreshPauseResumeVisibility(canResume);
 
         if (!sessionFinalized) {
             updateScanStatusIdle();
