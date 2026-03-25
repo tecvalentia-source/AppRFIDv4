@@ -24,11 +24,15 @@
         <item name="colorSurface">@color/menu_card_white</item>
     </style>
 
-    <style name="Theme.AppRFID.Module" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+    <style name="Theme.AppRFID.Module" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/menu_background_blue</item>
         <item name="colorOnPrimary">@color/menu_text_on_colored</item>
+
         <item name="android:statusBarColor">@color/menu_background_blue</item>
         <item name="android:navigationBarColor">@color/menu_background_blue</item>
         <item name="android:windowLightStatusBar">false</item>
+
+        <item name="colorSurface">@color/menu_card_white</item>
+        <item name="colorOnSurface">@android:color/black</item>
     </style>
 </resources>
