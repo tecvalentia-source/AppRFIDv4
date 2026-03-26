@@ -47,6 +47,7 @@
     <string name="filter_export_chooser">Compartir archivo</string>
     <string name="filter_grouped_clear">Limpiar</string>
     <string name="filter_grouped_clear_confirm">¿Vaciar la lista, reiniciar contadores y borrar el texto de búsqueda? Si el escaneo está activo, se detendrá.</string>
+    <string name="filter_individual_clear_confirm">¿Vaciar la lista, reiniciar contadores y borrar el texto de búsqueda? Si el escaneo está activo, se detendrá.</string>
 
     <string name="mass_read_title">Lectura masiva</string>
     <string name="mass_read_file_label">Nombre de archivo</string>
@@ -181,4 +182,5 @@
     <string name="action_settings">Configuración</string>
     <string name="first_fragment_label">Primer Fragmento</string>
     <string name="second_fragment_label">Segundo Fragmento</string>
+
 </resources>

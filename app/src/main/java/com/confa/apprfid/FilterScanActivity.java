@@ -64,6 +64,7 @@ public class FilterScanActivity extends AppCompatActivity {
     private TextView tvGroupedStats;
     private MaterialCardView cardExportGrouped;
     private MaterialCardView cardClearGrouped;
+    private MaterialCardView cardClearIndividual;
     private Switch switchBeep;
     private SeekBar seekBeepVolume;
     private TextView tvBeepVolumeLabel;
@@ -112,6 +113,7 @@ public class FilterScanActivity extends AppCompatActivity {
         tvGroupedStats = findViewById(R.id.tvGroupedStats);
         cardExportGrouped = findViewById(R.id.cardExportGrouped);
         cardClearGrouped = findViewById(R.id.cardClearGrouped);
+        cardClearIndividual = findViewById(R.id.cardClearIndividual);
         switchBeep = findViewById(R.id.switchFilterBeep);
         seekBeepVolume = findViewById(R.id.seekFilterBeepVolume);
         tvBeepVolumeLabel = findViewById(R.id.tvFilterBeepVolumeLabel);
@@ -168,6 +170,12 @@ public class FilterScanActivity extends AppCompatActivity {
         cardClearGrouped.setOnClickListener(v -> UiDialogs.showConfirm(this,
                 getString(R.string.filter_grouped_clear_confirm),
                 this::performGroupedClear));
+
+        cardClearIndividual.setOnClickListener(v -> {
+            UiDialogs.showConfirm(this,
+                    getString(R.string.filter_individual_clear_confirm),
+                    this::performIndividualClear);
+        });
 
         initReader();
     }
@@ -292,6 +300,21 @@ public class FilterScanActivity extends AppCompatActivity {
         etFilter.setText("");
     }
 
+    private void performIndividualClear() {
+        if (scanning) {
+            stopScanInternal();
+            tvToggle.setText(R.string.filter_start_scan);
+            setToggleCardColor(false);
+        }
+
+        etFilter.setText("");
+
+        tvIndEpc.setText("—");
+        tvIndRssi.setText("—");
+        tvIndProximity.setText("");
+        progressInd.setProgress(0);
+        nextBeepAt = 0L;
+        }
     private void exportGroupedResults() {
         if (groupedMap.isEmpty()) {
             UiDialogs.showOk(this, getString(R.string.filter_export_empty));

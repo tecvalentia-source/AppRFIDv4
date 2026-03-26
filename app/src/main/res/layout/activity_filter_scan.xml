@@ -40,9 +40,10 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:theme="@style/WhiteRadioButton"                  android:checked="true"
+                    android:checked="true"
                     android:text="@string/filter_mode_individual"
-                    android:textColor="@color/menu_text_on_colored" />
+                    android:textColor="@color/menu_text_on_colored"
+                    android:theme="@style/WhiteRadioButton" />
 
                 <RadioButton
                     android:id="@+id/radioGrouped"
