@@ -713,6 +713,7 @@ public class MainActivity extends AppCompatActivity {
 
         ioExecutor.execute(() -> {
             try {
+                // 1. Obtener coordenadas y escribir archivos Excel (Operaciones de fondo OK)
                 String coord = ExportLocationHelper.getCoordinatesForExport(appCtx);
 
                 if (mode == AppMode.RECONCILE && reconSnapshot != null) {
@@ -727,83 +728,103 @@ public class MainActivity extends AppCompatActivity {
                     Uri uFal = PublicDownloadsExport.insertWriteAndPublish(appCtx, nFal,
                             out -> ConciliationReportWriter.writeFaltantes(out, reconSnapshot.faltantes, coord));
 
-                    PieChart pieExport = new PieChart(appCtx);
-                    ConfaChartKit.stylePieForBitmap(pieExport);
-                    ConfaChartKit.bindReconcileResultPie(pieExport,
-                            reconSnapshot.exitosos.size(),
-                            reconSnapshot.sobrantes.size(),
-                            reconSnapshot.faltantes.size());
-                    Bitmap bmpPie = ConfaChartKit.renderPieBitmap(appCtx, pieExport);
-                    String nGraf = ExportFileNamer.buildPngFileName(prefix, scanSan, dateYyyyMmDd, "GRAFCONC");
-                    Uri uGraf = PublicDownloadsExport.insertPngAndPublish(appCtx, nGraf, bmpPie);
-                    bmpPie.recycle();
-
-                    ArrayList<Uri> uris = new ArrayList<>(4);
-                    uris.add(uOk);
-                    uris.add(uSob);
-                    uris.add(uFal);
-                    uris.add(uGraf);
-
+                    // 2. CORRECCIÓN: Saltar al hilo principal para CREAR el gráfico
                     mainHandler.post(() -> {
-                        setLoadingOverlayVisible(false);
-                        showAlert(getString(R.string.export_saved_downloads,
-                                PublicDownloadsExport.DOWNLOADS_SUBFOLDER), () ->
-                                shareExcelFilesAsChooser(uris,
-                                        getString(R.string.export_subject_conciliation),
-                                        getString(R.string.export_chooser_four_files)));
+                        PieChart pieExport = new PieChart(MainActivity.this); // Usar Activity Context
+                        ConfaChartKit.stylePieForBitmap(pieExport);
+                        ConfaChartKit.bindReconcileResultPie(pieExport,
+                                reconSnapshot.exitosos.size(),
+                                reconSnapshot.sobrantes.size(),
+                                reconSnapshot.faltantes.size());
+
+                        Bitmap bmpPie = ConfaChartKit.renderPieBitmap(appCtx, pieExport);
+
+                        // 3. Volver al fondo para guardar la imagen generada
+                        ioExecutor.execute(() -> {
+                            try {
+                                String nGraf = ExportFileNamer.buildPngFileName(prefix, scanSan, dateYyyyMmDd, "GRAFCONC");
+                                Uri uGraf = PublicDownloadsExport.insertPngAndPublish(appCtx, nGraf, bmpPie);
+                                bmpPie.recycle();
+
+                                ArrayList<Uri> uris = new ArrayList<>();
+                                uris.add(uOk); uris.add(uSob); uris.add(uFal); uris.add(uGraf);
+
+                                mainHandler.post(() -> {
+                                    setLoadingOverlayVisible(false);
+                                    showAlert(getString(R.string.export_saved_downloads,
+                                            PublicDownloadsExport.DOWNLOADS_SUBFOLDER), () ->
+                                            shareExcelFilesAsChooser(uris,
+                                                    getString(R.string.export_subject_conciliation),
+                                                    getString(R.string.export_chooser_four_files)));
+                                });
+                            } catch (IOException e) {
+                                handleExportError(e);
+                            }
+                        });
                     });
+
                 } else if (mode == AppMode.MISSING_SEARCH && missingSnapshot != null) {
                     String nBus = ExportFileNamer.buildFileName(prefix, scanSan, dateYyyyMmDd, "BUSQFAL");
-                    Uri uri = PublicDownloadsExport.insertWriteAndPublish(appCtx, nBus,
+                    Uri uriExcel = PublicDownloadsExport.insertWriteAndPublish(appCtx, nBus,
                             out -> ConciliationReportWriter.writeMissingSearchReport(out, missingSnapshot, coord));
+
                     int foundC = 0;
                     for (MissingSearchResultRow r : missingSnapshot) {
-                        if (r != null && r.encontrado) {
-                            foundC++;
-                        }
+                        if (r != null && r.encontrado) foundC++;
                     }
-                    int notFoundC = Math.max(0, missingSnapshot.size() - foundC);
-                    BarChart bar = new BarChart(appCtx);
-                    ConfaChartKit.styleBarForBitmap(bar);
-                    ConfaChartKit.bindMissingBar(bar, foundC, notFoundC);
-                    Bitmap bmpBar = ConfaChartKit.renderBarBitmap(bar);
-                    String nBar = ExportFileNamer.buildPngFileName(prefix, scanSan, dateYyyyMmDd, "GRAFBUSFAL");
-                    Uri uBar = PublicDownloadsExport.insertPngAndPublish(appCtx, nBar, bmpBar);
-                    bmpBar.recycle();
+                    final int finalFound = foundC;
+                    final int finalNotFound = Math.max(0, missingSnapshot.size() - foundC);
 
-                    ArrayList<Uri> two = new ArrayList<>(2);
-                    two.add(uri);
-                    two.add(uBar);
+                    // CORRECCIÓN: Saltar al hilo principal para el BarChart
                     mainHandler.post(() -> {
-                        setLoadingOverlayVisible(false);
-                        showAlert(getString(R.string.export_saved_downloads,
-                                PublicDownloadsExport.DOWNLOADS_SUBFOLDER), () ->
-                                shareExcelFilesAsChooser(two,
-                                        getString(R.string.export_subject_missing),
-                                        getString(R.string.export_chooser_two_with_chart)));
+                        BarChart bar = new BarChart(MainActivity.this);
+                        ConfaChartKit.styleBarForBitmap(bar);
+                        ConfaChartKit.bindMissingBar(bar, finalFound, finalNotFound);
+                        Bitmap bmpBar = ConfaChartKit.renderBarBitmap(bar);
+
+                        ioExecutor.execute(() -> {
+                            try {
+                                String nBar = ExportFileNamer.buildPngFileName(prefix, scanSan, dateYyyyMmDd, "GRAFBUSFAL");
+                                Uri uBar = PublicDownloadsExport.insertPngAndPublish(appCtx, nBar, bmpBar);
+                                bmpBar.recycle();
+
+                                ArrayList<Uri> uris = new ArrayList<>();
+                                uris.add(uriExcel); uris.add(uBar);
+
+                                mainHandler.post(() -> {
+                                    setLoadingOverlayVisible(false);
+                                    showAlert(getString(R.string.export_saved_downloads,
+                                            PublicDownloadsExport.DOWNLOADS_SUBFOLDER), () ->
+                                            shareExcelFilesAsChooser(uris,
+                                                    getString(R.string.export_subject_missing),
+                                                    getString(R.string.export_chooser_two_with_chart)));
+                                });
+                            } catch (IOException e) {
+                                handleExportError(e);
+                            }
+                        });
                     });
+
                 } else {
                     mainHandler.post(() -> {
                         setLoadingOverlayVisible(false);
                         showAlert(R.string.export_nothing);
                     });
                 }
-            } catch (IOException e) {
-                Log.e(TAG, "export", e);
-                mainHandler.post(() -> {
-                    setLoadingOverlayVisible(false);
-                    showAlert(exportFailureMessage(e));
-                });
-            } catch (RuntimeException e) {
-                Log.e(TAG, "export runtime", e);
-                mainHandler.post(() -> {
-                    setLoadingOverlayVisible(false);
-                    showAlert(exportFailureMessage(e));
-                });
+            } catch (IOException | RuntimeException e) {
+                handleExportError(e);
             }
         });
     }
 
+    /** Método auxiliar para centralizar errores en el hilo principal */
+    private void handleExportError(Throwable e) {
+        Log.e(TAG, "export error", e);
+        mainHandler.post(() -> {
+            setLoadingOverlayVisible(false);
+            showAlert(exportFailureMessage(e));
+        });
+    }
     @NonNull
     private String exportFailureMessage(@NonNull Throwable e) {
         String base = getString(R.string.export_io_error);
@@ -875,24 +896,35 @@ public class MainActivity extends AppCompatActivity {
 
     private void persistMasterUbicacionChartPng(@NonNull Map<String, Integer> counts, boolean shareAfter) {
         setLoadingOverlayVisible(true);
-        final Context appCtx = getApplicationContext();
+
+        // 1. Preparamos los datos básicos en el hilo principal
         String sede = getSelectedSede();
         final String prefix = SedePrefix.forSedeDisplayName(sede.isEmpty() ? "GEN" : sede);
         final String scanPart = hasScanName()
                 ? ExportFileNamer.sanitizeScanName(getScanNameTrimmed())
                 : "Distrib";
         final String date = new SimpleDateFormat("yyyyMMdd", Locale.US).format(new Date());
+        final Context appCtx = getApplicationContext();
 
+        // 2. CORRECCIÓN: Creamos el gráfico y el Bitmap en el HILO PRINCIPAL
+        // Las "Views" como PieChart requieren el Looper del hilo de interfaz.
+        PieChart pc = new PieChart(this); // Usamos 'this' (Activity) para los estilos
+        ConfaChartKit.stylePieForBitmap(pc);
+        ConfaChartKit.bindUbicacionPie(pc, new HashMap<>(counts));
+
+        // Generamos el bitmap (operación de dibujo de la vista)
+        Bitmap bmp = ConfaChartKit.renderPieBitmap(appCtx, pc);
+
+        // 3. Ahora sí, pasamos al hilo de fondo SOLO para la escritura en disco (IO)
         ioExecutor.execute(() -> {
             try {
-                Map<String, Integer> snap = new HashMap<>(counts);
-                PieChart pc = new PieChart(appCtx);
-                ConfaChartKit.stylePieForBitmap(pc);
-                ConfaChartKit.bindUbicacionPie(pc, snap);
-                Bitmap bmp = ConfaChartKit.renderPieBitmap(appCtx, pc);
                 String name = ExportFileNamer.buildPngFileName(prefix, scanPart, date, "DISTUBI");
                 Uri uri = PublicDownloadsExport.insertPngAndPublish(appCtx, name, bmp);
+
+                // Liberamos la memoria del bitmap una vez guardado
                 bmp.recycle();
+
+                // 4. Volvemos al hilo principal para avisar al usuario
                 mainHandler.post(() -> {
                     setLoadingOverlayVisible(false);
                     if (shareAfter) {
@@ -905,7 +937,10 @@ public class MainActivity extends AppCompatActivity {
                     }
                 });
             } catch (Exception e) {
-                Log.e(TAG, "chart png", e);
+                Log.e(TAG, "chart png error", e);
+                // Si hubo error, reciclamos el bitmap si aún existe
+                if (bmp != null && !bmp.isRecycled()) bmp.recycle();
+
                 mainHandler.post(() -> {
                     setLoadingOverlayVisible(false);
                     showAlert(exportFailureMessage(e));
@@ -913,7 +948,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
-
     /**
      * Comparte uno o varios .xls con {@code content://} y permisos de lectura temporales.
      * Para varios adjuntos el intent usa MIME comodín (mejor compatibilidad con Gmail/Drive).
