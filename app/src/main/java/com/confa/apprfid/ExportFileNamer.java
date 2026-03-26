@@ -65,4 +65,13 @@ public final class ExportFileNamer {
         return String.format(Locale.US, "%s_%s_%s.xls",
                 sedePrefix, sanitizedFileBaseName, dateYyyyMmDd);
     }
+
+    @NonNull
+    public static String buildPngFileName(@NonNull String sedePrefix,
+            @NonNull String sanitizedScanName,
+            @NonNull String dateYyyyMmDd,
+            @NonNull String typeSuffix) {
+        return String.format(Locale.US, "%s_%s_%s_%s.png",
+                sedePrefix, sanitizedScanName, dateYyyyMmDd, typeSuffix);
+    }
 }

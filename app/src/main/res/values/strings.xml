@@ -140,6 +140,21 @@
     <string name="export_io_error">Error al generar el archivo</string>
     <string name="export_chooser">Compartir reporte</string>
     <string name="export_chooser_three_files">Compartir 3 reportes (.xls)</string>
+    <string name="export_chooser_four_files">Compartir reportes (.xls) y gráfico (.png)</string>
+    <string name="export_chooser_two_with_chart">Compartir reporte y gráfico (.png)</string>
+    <string name="chart_distrib_ubicacion_title">Distribución por ubicación</string>
+    <string name="chart_distrib_ubicacion_subtitle">Registros del maestro según el campo Ubicación.</string>
+    <string name="chart_action_download">Descargar</string>
+    <string name="chart_action_share">Compartir</string>
+    <string name="chart_label_exitosos">Exitosos</string>
+    <string name="chart_label_sobrantes">Sobrantes</string>
+    <string name="chart_label_faltantes">Faltantes</string>
+    <string name="chart_label_found">Localizados</string>
+    <string name="chart_label_not_found">No localizados</string>
+    <string name="chart_label_found_short">Loc.</string>
+    <string name="chart_label_not_found_short">No loc.</string>
+    <string name="chart_no_data">Sin datos</string>
+    <string name="chart_saved_downloads">Gráfico guardado en Descargas/%1$s</string>
     <string name="export_subject_conciliation">Conciliación RFID</string>
     <string name="export_subject_missing">Búsqueda faltantes RFID</string>
 

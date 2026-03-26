@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="true"
+    android:padding="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"
+            android:text="@string/chart_distrib_ubicacion_subtitle"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="13sp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="@color/menu_card_white"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp">
+
+            <com.github.mikephil.charting.charts.PieChart
+                android:id="@+id/chartUbicacion"
+                android:layout_width="match_parent"
+                android:layout_height="300dp"
+                android:minHeight="260dp" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnChartDownload"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:minHeight="48dp"
+                android:paddingVertical="12dp"
+                android:text="@string/chart_action_download"
+                android:textAllCaps="false"
+                app:cornerRadius="20dp"
+                app:strokeColor="@color/menu_brand_blue" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnChartShare"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:minHeight="48dp"
+                android:paddingVertical="12dp"
+                android:text="@string/chart_action_share"
+                android:textAllCaps="false"
+                app:backgroundTint="@color/menu_card_orange"
+                app:cornerRadius="20dp" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

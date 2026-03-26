@@ -12,4 +12,12 @@
     <color name="menu_card_orange">#FF8A34</color>
     <color name="menu_text_on_white">#00AEEF</color>
     <color name="menu_text_on_colored">#FFFFFF</color>
+
+    <!-- Gráficos Confa (MPAndroidChart) -->
+    <color name="chart_confa_blue">#00AEEF</color>
+    <color name="chart_confa_yellow">#FFB900</color>
+    <color name="chart_confa_green">#8DB600</color>
+    <color name="chart_confa_blue_dark">#007BB0</color>
+    <color name="chart_confa_yellow_dark">#CC9400</color>
+    <color name="chart_confa_green_dark">#6E9500</color>
 </resources>

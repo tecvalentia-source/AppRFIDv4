@@ -79,5 +79,6 @@ dependencies {
     implementation("org.apache.poi:poi:$poiVersion")
     implementation("org.apache.poi:poi-ooxml:$poiVersion")
 
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
 }

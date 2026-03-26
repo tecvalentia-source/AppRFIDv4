@@ -3,6 +3,7 @@ package com.confa.apprfid;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -24,6 +25,7 @@ public final class PublicDownloadsExport {
     public static final String DOWNLOADS_SUBFOLDER = "ConfaAppRFID";
 
     private static final String MIME_SPREADSHEET = "application/vnd.ms-excel";
+    private static final String MIME_PNG = "image/png";
 
     private PublicDownloadsExport() {
     }
@@ -66,6 +68,55 @@ public final class PublicDownloadsExport {
             int updated = resolver.update(uri, values, null, null);
             if (updated < 1) {
                 throw new IOException("No se pudo publicar el archivo en Descargas");
+            }
+        } catch (IOException e) {
+            try {
+                resolver.delete(uri, null, null);
+            } catch (RuntimeException ignored) {
+            }
+            throw e;
+        }
+        return uri;
+    }
+
+    /**
+     * Guarda un PNG en la misma carpeta pública que los reportes.
+     */
+    @RequiresApi(Build.VERSION_CODES.Q)
+    @NonNull
+    public static Uri insertPngAndPublish(@NonNull Context context,
+            @NonNull String displayName,
+            @NonNull Bitmap bitmap) throws IOException {
+        if (bitmap.isRecycled()) {
+            throw new IOException("Bitmap reciclado");
+        }
+        ContentResolver resolver = context.getApplicationContext().getContentResolver();
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.MediaColumns.DISPLAY_NAME, displayName);
+        values.put(MediaStore.MediaColumns.MIME_TYPE, MIME_PNG);
+        values.put(MediaStore.MediaColumns.RELATIVE_PATH,
+                Environment.DIRECTORY_DOWNLOADS + "/" + DOWNLOADS_SUBFOLDER);
+        values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+
+        Uri uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+        if (uri == null) {
+            throw new IOException("No se pudo crear PNG en Descargas");
+        }
+        try {
+            OutputStream out = resolver.openOutputStream(uri);
+            if (out == null) {
+                throw new IOException("Salida nula PNG");
+            }
+            try (OutputStream outClose = out) {
+                if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, outClose)) {
+                    throw new IOException("Falló compresión PNG");
+                }
+            }
+            values.clear();
+            values.put(MediaStore.MediaColumns.IS_PENDING, 0);
+            int updated = resolver.update(uri, values, null, null);
+            if (updated < 1) {
+                throw new IOException("No se pudo publicar PNG");
             }
         } catch (IOException e) {
             try {

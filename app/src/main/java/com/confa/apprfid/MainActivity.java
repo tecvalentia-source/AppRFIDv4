@@ -5,6 +5,7 @@ import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -17,6 +18,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.Spinner;
 import android.widget.TextView;
 
@@ -30,6 +32,8 @@ import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.github.mikephil.charting.charts.BarChart;
+import com.github.mikephil.charting.charts.PieChart;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.rscja.deviceapi.RFIDWithUHFUART;
@@ -95,6 +99,7 @@ public class MainActivity extends AppCompatActivity {
     private View rowHeadersMissing;
     private RecyclerView rvMaster;
     private TextView tvScanStatus;
+    private ImageButton btnMasterUbicacionChart;
     private TextView tvCounterUnique;
     private TextView tvCounterTotal;
     private TextView tvMissingFound;
@@ -181,6 +186,7 @@ public class MainActivity extends AppCompatActivity {
         rvMaster = findViewById(R.id.rvMaster);
         missingAdapter = new MissingRfidAdapter(foundMissingKeys);
         tvScanStatus = findViewById(R.id.tvScanStatus);
+        btnMasterUbicacionChart = findViewById(R.id.btnMasterUbicacionChart);
         tvCounterUnique = findViewById(R.id.tvCounterUnique);
         tvCounterTotal = findViewById(R.id.tvCounterTotal);
         tvMissingFound = findViewById(R.id.tvMissingFound);
@@ -235,6 +241,9 @@ public class MainActivity extends AppCompatActivity {
         cardResume.setOnClickListener(v -> resumeScanning());
         cardFinalize.setOnClickListener(v -> finalizeSession());
         cardExportReports.setOnClickListener(v -> exportReports());
+        if (btnMasterUbicacionChart != null) {
+            btnMasterUbicacionChart.setOnClickListener(v -> showMasterUbicacionChartDialog());
+        }
 
         etScanName.addTextChangedListener(new TextWatcher() {
             @Override
@@ -633,8 +642,7 @@ public class MainActivity extends AppCompatActivity {
                     lastReconciliation = result;
                     sessionFinalized = true;
                     tvScanStatus.setText(R.string.scan_status_done);
-                    showAlert(getString(R.string.session_summary_reconcile,
-                            result.exitosos.size(), result.sobrantes.size(), result.faltantes.size()));
+                    showReconcileFinalizeSummary(result);
                     refreshActionStates();
                 });
             });
@@ -652,7 +660,7 @@ public class MainActivity extends AppCompatActivity {
                     lastMissingReport = rows;
                     sessionFinalized = true;
                     tvScanStatus.setText(R.string.scan_status_done);
-                    showAlert(getString(R.string.session_summary_missing, localizados, totalFaltantesLista));
+                    showMissingFinalizeSummary(localizados, totalFaltantesLista);
                     refreshActionStates();
                 });
             });
@@ -719,10 +727,22 @@ public class MainActivity extends AppCompatActivity {
                     Uri uFal = PublicDownloadsExport.insertWriteAndPublish(appCtx, nFal,
                             out -> ConciliationReportWriter.writeFaltantes(out, reconSnapshot.faltantes, coord));
 
-                    ArrayList<Uri> uris = new ArrayList<>(3);
+                    PieChart pieExport = new PieChart(appCtx);
+                    ConfaChartKit.stylePieForBitmap(pieExport);
+                    ConfaChartKit.bindReconcileResultPie(pieExport,
+                            reconSnapshot.exitosos.size(),
+                            reconSnapshot.sobrantes.size(),
+                            reconSnapshot.faltantes.size());
+                    Bitmap bmpPie = ConfaChartKit.renderPieBitmap(appCtx, pieExport);
+                    String nGraf = ExportFileNamer.buildPngFileName(prefix, scanSan, dateYyyyMmDd, "GRAFCONC");
+                    Uri uGraf = PublicDownloadsExport.insertPngAndPublish(appCtx, nGraf, bmpPie);
+                    bmpPie.recycle();
+
+                    ArrayList<Uri> uris = new ArrayList<>(4);
                     uris.add(uOk);
                     uris.add(uSob);
                     uris.add(uFal);
+                    uris.add(uGraf);
 
                     mainHandler.post(() -> {
                         setLoadingOverlayVisible(false);
@@ -730,21 +750,37 @@ public class MainActivity extends AppCompatActivity {
                                 PublicDownloadsExport.DOWNLOADS_SUBFOLDER), () ->
                                 shareExcelFilesAsChooser(uris,
                                         getString(R.string.export_subject_conciliation),
-                                        getString(R.string.export_chooser_three_files)));
+                                        getString(R.string.export_chooser_four_files)));
                     });
                 } else if (mode == AppMode.MISSING_SEARCH && missingSnapshot != null) {
                     String nBus = ExportFileNamer.buildFileName(prefix, scanSan, dateYyyyMmDd, "BUSQFAL");
                     Uri uri = PublicDownloadsExport.insertWriteAndPublish(appCtx, nBus,
                             out -> ConciliationReportWriter.writeMissingSearchReport(out, missingSnapshot, coord));
-                    ArrayList<Uri> one = new ArrayList<>(1);
-                    one.add(uri);
+                    int foundC = 0;
+                    for (MissingSearchResultRow r : missingSnapshot) {
+                        if (r != null && r.encontrado) {
+                            foundC++;
+                        }
+                    }
+                    int notFoundC = Math.max(0, missingSnapshot.size() - foundC);
+                    BarChart bar = new BarChart(appCtx);
+                    ConfaChartKit.styleBarForBitmap(bar);
+                    ConfaChartKit.bindMissingBar(bar, foundC, notFoundC);
+                    Bitmap bmpBar = ConfaChartKit.renderBarBitmap(bar);
+                    String nBar = ExportFileNamer.buildPngFileName(prefix, scanSan, dateYyyyMmDd, "GRAFBUSFAL");
+                    Uri uBar = PublicDownloadsExport.insertPngAndPublish(appCtx, nBar, bmpBar);
+                    bmpBar.recycle();
+
+                    ArrayList<Uri> two = new ArrayList<>(2);
+                    two.add(uri);
+                    two.add(uBar);
                     mainHandler.post(() -> {
                         setLoadingOverlayVisible(false);
                         showAlert(getString(R.string.export_saved_downloads,
                                 PublicDownloadsExport.DOWNLOADS_SUBFOLDER), () ->
-                                shareExcelFilesAsChooser(one,
+                                shareExcelFilesAsChooser(two,
                                         getString(R.string.export_subject_missing),
-                                        getString(R.string.export_chooser)));
+                                        getString(R.string.export_chooser_two_with_chart)));
                     });
                 } else {
                     mainHandler.post(() -> {
@@ -776,6 +812,106 @@ public class MainActivity extends AppCompatActivity {
             detail = e.getClass().getSimpleName();
         }
         return base + ": " + detail;
+    }
+
+    private void showReconcileFinalizeSummary(@NonNull ReconciliationEngine.Result result) {
+        View v = getLayoutInflater().inflate(R.layout.dialog_session_summary, null, false);
+        TextView tv = v.findViewById(R.id.tvSessionSummaryMessage);
+        PieChart chart = v.findViewById(R.id.chartSessionSummary);
+        tv.setText(getString(R.string.session_summary_reconcile,
+                result.exitosos.size(), result.sobrantes.size(), result.faltantes.size()));
+        ConfaChartKit.stylePieForDialog(chart);
+        ConfaChartKit.bindReconcileResultPie(chart,
+                result.exitosos.size(), result.sobrantes.size(), result.faltantes.size());
+        chart.invalidate();
+        new MaterialAlertDialogBuilder(this, R.style.ThemeOverlay_AppRFID_MaterialAlertDialog)
+                .setTitle(R.string.scan_status_done)
+                .setView(v)
+                .setPositiveButton(R.string.dialog_ok, (d, w) -> d.dismiss())
+                .show();
+    }
+
+    private void showMissingFinalizeSummary(int localizados, int totalLista) {
+        int noLoc = Math.max(0, totalLista - localizados);
+        View v = getLayoutInflater().inflate(R.layout.dialog_session_summary, null, false);
+        TextView tv = v.findViewById(R.id.tvSessionSummaryMessage);
+        PieChart chart = v.findViewById(R.id.chartSessionSummary);
+        tv.setText(getString(R.string.session_summary_missing, localizados, totalLista));
+        ConfaChartKit.stylePieForDialog(chart);
+        ConfaChartKit.bindMissingFoundPie(chart, localizados, noLoc);
+        chart.invalidate();
+        new MaterialAlertDialogBuilder(this, R.style.ThemeOverlay_AppRFID_MaterialAlertDialog)
+                .setTitle(R.string.scan_status_done)
+                .setView(v)
+                .setPositiveButton(R.string.dialog_ok, (d, w) -> d.dismiss())
+                .show();
+    }
+
+    private void showMasterUbicacionChartDialog() {
+        if (masterRecordsAll.isEmpty()) {
+            return;
+        }
+        final Map<String, Integer> counts =
+                new HashMap<>(ConfaChartKit.countRecordsByUbicacion(masterRecordsAll));
+        View root = getLayoutInflater().inflate(R.layout.dialog_master_ubicacion_chart, null, false);
+        PieChart pie = root.findViewById(R.id.chartUbicacion);
+        ConfaChartKit.stylePieForDialog(pie);
+        ConfaChartKit.bindUbicacionPie(pie, counts);
+        pie.invalidate();
+
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this,
+                R.style.ThemeOverlay_AppRFID_MaterialAlertDialog);
+        builder.setTitle(R.string.chart_distrib_ubicacion_title);
+        builder.setView(root);
+        builder.setPositiveButton(R.string.dialog_ok, (d, w) -> d.dismiss());
+        androidx.appcompat.app.AlertDialog dialog = builder.create();
+
+        root.findViewById(R.id.btnChartDownload).setOnClickListener(v ->
+                persistMasterUbicacionChartPng(counts, false));
+        root.findViewById(R.id.btnChartShare).setOnClickListener(v ->
+                persistMasterUbicacionChartPng(counts, true));
+        dialog.show();
+    }
+
+    private void persistMasterUbicacionChartPng(@NonNull Map<String, Integer> counts, boolean shareAfter) {
+        setLoadingOverlayVisible(true);
+        final Context appCtx = getApplicationContext();
+        String sede = getSelectedSede();
+        final String prefix = SedePrefix.forSedeDisplayName(sede.isEmpty() ? "GEN" : sede);
+        final String scanPart = hasScanName()
+                ? ExportFileNamer.sanitizeScanName(getScanNameTrimmed())
+                : "Distrib";
+        final String date = new SimpleDateFormat("yyyyMMdd", Locale.US).format(new Date());
+
+        ioExecutor.execute(() -> {
+            try {
+                Map<String, Integer> snap = new HashMap<>(counts);
+                PieChart pc = new PieChart(appCtx);
+                ConfaChartKit.stylePieForBitmap(pc);
+                ConfaChartKit.bindUbicacionPie(pc, snap);
+                Bitmap bmp = ConfaChartKit.renderPieBitmap(appCtx, pc);
+                String name = ExportFileNamer.buildPngFileName(prefix, scanPart, date, "DISTUBI");
+                Uri uri = PublicDownloadsExport.insertPngAndPublish(appCtx, name, bmp);
+                bmp.recycle();
+                mainHandler.post(() -> {
+                    setLoadingOverlayVisible(false);
+                    if (shareAfter) {
+                        ShareExportHelper.shareSingleImage(MainActivity.this, uri,
+                                getString(R.string.chart_distrib_ubicacion_title),
+                                getString(R.string.chart_action_share));
+                    } else {
+                        UiDialogs.showOk(MainActivity.this, getString(R.string.chart_saved_downloads,
+                                PublicDownloadsExport.DOWNLOADS_SUBFOLDER));
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "chart png", e);
+                mainHandler.post(() -> {
+                    setLoadingOverlayVisible(false);
+                    showAlert(exportFailureMessage(e));
+                });
+            }
+        });
     }
 
     /**
@@ -871,6 +1007,13 @@ public class MainActivity extends AppCompatActivity {
         enableIfChanged(etScanName, editingAllowed);
 
         refreshPauseResumeVisibility(canResume);
+
+        if (btnMasterUbicacionChart != null) {
+            btnMasterUbicacionChart.setVisibility(
+                    appMode == AppMode.RECONCILE && !masterRecordsAll.isEmpty()
+                            ? View.VISIBLE
+                            : View.GONE);
+        }
 
         if (!sessionFinalized) {
             updateScanStatusIdle();

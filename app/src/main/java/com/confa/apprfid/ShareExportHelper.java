@@ -36,4 +36,23 @@ public final class ShareExportHelper {
             UiDialogs.showOk(activity, activity.getString(R.string.export_io_error));
         }
     }
+
+    public static void shareSingleImage(@NonNull Activity activity, @NonNull Uri uri,
+            @NonNull String subject, @NonNull String chooserTitle) {
+        int readFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION;
+        Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType("image/png");
+        send.putExtra(Intent.EXTRA_STREAM, uri);
+        send.putExtra(Intent.EXTRA_SUBJECT, subject);
+        send.setClipData(ClipData.newUri(activity.getContentResolver(), subject, uri));
+        send.addFlags(readFlags);
+        Intent chooser = Intent.createChooser(send, chooserTitle);
+        chooser.addFlags(readFlags);
+        try {
+            activity.startActivity(chooser);
+        } catch (android.content.ActivityNotFoundException ex) {
+            Log.w(TAG, "share image", ex);
+            UiDialogs.showOk(activity, activity.getString(R.string.export_io_error));
+        }
+    }
 }
