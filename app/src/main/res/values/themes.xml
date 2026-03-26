@@ -35,4 +35,6 @@
         <item name="colorSurface">@color/menu_card_white</item>
         <item name="colorOnSurface">@android:color/black</item>
     </style>
+    <style name="WhiteRadioButton" parent="Theme.AppCompat.Light">
+        <item name="colorControlNormal">@color/white</item> <item name="colorControlActivated">@color/white</item> </style>
 </resources>

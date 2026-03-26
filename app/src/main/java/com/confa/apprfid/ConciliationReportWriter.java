@@ -123,30 +123,53 @@ public final class ConciliationReportWriter {
     }
 
     public static void writeMissingSearchReport(OutputStream out, List<MissingSearchResultRow> data,
-            String coordenadas) throws IOException {
+                                                String coordenadas) throws IOException {
         String[] headers = {"RFID", "Encontrado", "Sede", "Coordenadas"};
-        List<String[]> rows = new ArrayList<>();
-        String c = "";
+
+        // Listas temporales para separar los datos
+        List<String[]> foundRows = new ArrayList<>();
+        List<String[]> notFoundRows = new ArrayList<>();
+
         if (data != null) {
             for (MissingSearchResultRow rowData : data) {
-
-
                 if (rowData == null) {
                     continue;
                 }
-                if (rowData.encontrado){
+
+                String c;
+                String encontradoTxt;
+
+                if (rowData.encontrado) {
                     c = safeCoord(coordenadas);
+                    encontradoTxt = "Sí";
+
+                    foundRows.add(new String[]{
+                            safe(rowData.rfid),
+                            encontradoTxt,
+                            safe(rowData.sede),
+                            c
+                    });
+                } else {
+                    c = ""; // O podrías usar "sin ubicación" según tu lógica
+                    encontradoTxt = "No";
+
+                    notFoundRows.add(new String[]{
+                            safe(rowData.rfid),
+                            encontradoTxt,
+                            safe(rowData.sede),
+                            c
+                    });
                 }
-                rows.add(new String[]{
-                        safe(rowData.rfid),
-                        rowData.encontrado ? "Sí" : "No",
-                        safe(rowData.sede),
-                        c
-                });
             }
         }
-        writeXlsxSpreadsheet(out, "Faltantes", headers, rows);
+
+        // Combinar ambas listas: primero los encontrados, luego los no encontrados
+        List<String[]> allRows = new ArrayList<>(foundRows);
+        allRows.addAll(notFoundRows);
+
+        writeXlsxSpreadsheet(out, "Faltantes", headers, allRows);
     }
+
 
     /**
      * Lectura masiva: RFID, ubicación/sede, coordenadas (misma fila para todas las lecturas).
